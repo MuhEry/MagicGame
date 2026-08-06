@@ -41,6 +41,11 @@ public class CategorySocket : XRSocketInteractor
     [SerializeField]
     Transform m_EjectDirectionSource;
 
+    [Tooltip("Disari atilan esya bu sure boyunca AYNI soket tarafindan tekrar alinmaz.\n" +
+             "0 yapilirsa esya trigger'dan cikamadigi anda sonsuz red dongusu olusur.")]
+    [SerializeField, Min(0f)]
+    float m_EjectIgnoreDuration = 1.5f;
+
     [Header("Doğru yerleştirme")]
     [Tooltip("Doğru karar geri bildirimi görünür kaldıktan sonra eşyanın kaldırılacağı süre.")]
     [SerializeField, Min(0f)]
@@ -65,6 +70,11 @@ public class CategorySocket : XRSocketInteractor
     // Dogru esya tuketilirken (geri bildirim + yok etme) ayni kilit.
     bool m_Accepting;
     Coroutine m_AcceptRoutine;
+
+    // Disari atilan esya trigger'dan cikamazsa soket onu aninda tekrar yakalar.
+    // Son atilan esyayi kisa bir sure yok sayiyoruz.
+    IXRSelectInteractable m_LastEjected;
+    float m_LastEjectTime = float.NegativeInfinity;
 
     // Inceleme suresi olcumu: esya bu soketin agzina yaklastigi anda baslar.
     // TODO(A/C): Gercek "inceleme suresi" esya kavrandigi anda baslamali.
@@ -111,6 +121,15 @@ public class CategorySocket : XRSocketInteractor
         // Ayni sey dogru esya tuketilirken de gecerli: 0,3 sn'lik geri bildirim
         // penceresinde araya baska bir esya girmesin.
         if (m_Accepting && !IsSelecting(interactable))
+            return false;
+
+        // Yeni disari atilan esyayi kisa sure yok say.
+        // Aksi halde: esya trigger kuresinden cikamiyor -> soket onu aninda tekrar
+        // yakaliyor -> sonsuz "YANLIS" dongusu. XRI hover'i geri donusum gecikmesiyle
+        // bloke eder ama SECIMI etmez; bu yuzden hover hic olmadan secim gerceklesir
+        // (log'da inceleme=0 ms bunun imzasidir).
+        if (ReferenceEquals(interactable, m_LastEjected) &&
+            Time.time - m_LastEjectTime < m_EjectIgnoreDuration)
             return false;
 
         return true;
@@ -201,9 +220,9 @@ public class CategorySocket : XRSocketInteractor
         }
         else
         {
-            if (m_RejectRoutine != null)
-                StopCoroutine(m_RejectRoutine);
-            m_RejectRoutine = StartCoroutine(RejectRoutine(interactable));
+            // Kabul tarafiyla ayni kural: calisan rutini YENIDEN BASLATMA.
+            if (m_RejectRoutine == null)
+                m_RejectRoutine = StartCoroutine(RejectRoutine(interactable));
         }
     }
 
@@ -302,10 +321,16 @@ public class CategorySocket : XRSocketInteractor
     {
         m_Rejecting = true;
 
+        var itemTransform = interactable?.transform;
+
         if (m_RejectDelay > 0f)
             yield return new WaitForSeconds(m_RejectDelay);
 
-        var itemTransform = interactable?.transform;
+        // Esyayi birakmadan ONCE "yeni atildi" damgasini vur. SelectExit,
+        // OnSelectExited'i senkron tetikler ve ayni karede CanSelect yeniden
+        // sorulabilir; damga o an hazir olmazsa esya aninda geri yakalanir.
+        m_LastEjected = interactable;
+        m_LastEjectTime = Time.time;
 
         if (interactionManager != null && interactable != null && IsSelecting(interactable))
             interactionManager.SelectExit(this, interactable);
