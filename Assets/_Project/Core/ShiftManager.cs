@@ -33,6 +33,7 @@ public class ShiftManager : MonoBehaviour
             itemId = itemId,
             correct = correct,
             chosen = chosen,
+            shakeCount = shakeCount,
             isCorrect = isCorrect,
             inspectMs = inspectMs,
             explanation = isCorrect
