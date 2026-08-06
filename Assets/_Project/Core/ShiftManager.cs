@@ -89,6 +89,12 @@ public class ShiftManager : MonoBehaviour
     /// </summary>
     public void StartShift()
     {
+        if (State == ShiftState.Vardiya)
+        {
+            Debug.LogWarning("ShiftManager: Aktif vardiya yeniden başlatılamaz.", this);
+            return;
+        }
+
         StopActiveRoutines();
 
         currentSessionId++;

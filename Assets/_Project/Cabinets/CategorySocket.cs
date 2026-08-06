@@ -41,6 +41,11 @@ public class CategorySocket : XRSocketInteractor
     [SerializeField]
     Transform m_EjectDirectionSource;
 
+    [Header("Doğru yerleştirme")]
+    [Tooltip("Doğru karar geri bildirimi görünür kaldıktan sonra eşyanın kaldırılacağı süre.")]
+    [SerializeField, Min(0f)]
+    float m_AcceptDelay = 0.3f;
+
     [Header("Geri bildirim")]
     [Tooltip("Bos birakilirsa ust objelerde aranir (genelde dolap kokunde durur).")]
     [SerializeField]
@@ -56,6 +61,7 @@ public class CategorySocket : XRSocketInteractor
     // Yanlis esya disari atilirken baska bir esyayi iceri almamak icin kilit.
     bool m_Rejecting;
     Coroutine m_RejectRoutine;
+    Coroutine m_AcceptRoutine;
 
     // Inceleme suresi olcumu: esya bu soketin agzina yaklastigi anda baslar.
     // TODO(A/C): Gercek "inceleme suresi" esya kavrandigi anda baslamali.
@@ -136,20 +142,20 @@ public class CategorySocket : XRSocketInteractor
 
         var isCorrect = itemCategory == m_AcceptedCategory;
 
-        // ------------------------------------------------------------------
-        // TODO: C'nin ShiftManager'i gelince buraya baglanacak.
-        //
-        //   ShiftManager.Instance.RegisterDecision(
-        //       itemId,
-        //       itemCategory,        // correct
-        //       m_AcceptedCategory,  // chosen
-        //       inspectMs,
-        //       shakeCount);         // <- A'nin ItemProbe'undan gelecek
-        //
-        // ShiftManager henuz repoda YOK. Sartnamenin B basari kriteri geregi
-        // "ShiftManager hentiz yokken bile bir Debug.Log ile akis gorunuyor"
-        // olmali; sahte/gecici bir ShiftManager sinifi UYDURULMAYACAK.
-        // ------------------------------------------------------------------
+        // A'nin ItemProbe'u henuz gelmedi. Test kupleri icin sallama sayisi 0'dır;
+        // A'nin gercek ItemIdentity/ItemProbe entegrasyonunda bu deger oradan okunacak.
+        const int shakeCount = 0;
+
+        if (ShiftManager.Instance != null && ShiftManager.Instance.State == ShiftState.Vardiya)
+        {
+            ShiftManager.Instance.RegisterDecision(
+                itemId,
+                itemCategory,
+                m_AcceptedCategory,
+                inspectMs,
+                shakeCount);
+        }
+
         Debug.Log(
             $"[KARAR] {(isCorrect ? "DOGRU" : "YANLIS")} | dolap={m_AcceptedCategory} | " +
             $"esya='{itemName}' (id={itemId}, kategori={itemCategory}) | " +
@@ -162,7 +168,13 @@ public class CategorySocket : XRSocketInteractor
         else
             Debug.LogWarning($"[CategorySocket] '{name}' uzerinde FeedbackController yok - sadece log var.", this);
 
-        if (!isCorrect)
+        if (isCorrect)
+        {
+            if (m_AcceptRoutine != null)
+                StopCoroutine(m_AcceptRoutine);
+            m_AcceptRoutine = StartCoroutine(AcceptRoutine(interactable));
+        }
+        else
         {
             if (m_RejectRoutine != null)
                 StopCoroutine(m_RejectRoutine);
@@ -177,7 +189,7 @@ public class CategorySocket : XRSocketInteractor
 
         // Esya (oyuncu tarafindan kapilmak dahil) herhangi bir sebeple ayrildiysa
         // reddetme surecini iptal et, kilidi acik birakma.
-        if (m_RejectRoutine != null && args.interactableObject != null && !IsSelecting(args.interactableObject))
+        if (!m_Rejecting && m_RejectRoutine != null && args.interactableObject != null && !IsSelecting(args.interactableObject))
         {
             StopCoroutine(m_RejectRoutine);
             m_RejectRoutine = null;
@@ -223,6 +235,28 @@ public class CategorySocket : XRSocketInteractor
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Doğru eşya geri bildirimin ardından soketten çıkarılır ve kaldırılır.
+    /// Böylece aynı kategorideki sonraki eşya için soket boş kalır.
+    /// </summary>
+    IEnumerator AcceptRoutine(IXRSelectInteractable interactable)
+    {
+        if (m_AcceptDelay > 0f)
+            yield return new WaitForSeconds(m_AcceptDelay);
+
+        var itemTransform = interactable?.transform;
+
+        if (interactionManager != null && interactable != null && IsSelecting(interactable))
+            interactionManager.SelectExit(this, interactable);
+
+        yield return null;
+
+        if (itemTransform != null)
+            Destroy(itemTransform.gameObject);
+
+        m_AcceptRoutine = null;
     }
 
     /// <summary>

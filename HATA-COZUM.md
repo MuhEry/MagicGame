@@ -16,7 +16,7 @@ Ortak hata defteri. **Kural: her hata + cozumu TEK SATIR.** Uzun aciklama yazma.
 
 - `CanSelect` imzasi `CanSelect(IXRSelectInteractable)`. 2.x'teki `CanSelect(XRBaseInteractable)` overload'i `XRBaseInteractor.deprecated.cs` icinde, kullanma.
 - Namespace'ler bolundu: `...Toolkit.Interactors` (XRSocketInteractor, XRBaseInteractor) / `...Toolkit.Interactables` (XRGrabInteractable, IXRSelectInteractable) / `...Toolkit` (SelectEnterEventArgs, XRInteractionManager).
-- Haptik: 2.x'teki `XRBaseController.SendHapticImpulse(a, d)` deprecated. 3.x'te `HapticsUtility.SendHapticImpulse(amplitude, duration, HapticsUtility.Controller.Both)` — namespace `UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics`.
+- Haptik: Bilinen tek kumandaya doğrudan `SendHapticImpulse(a, d)` gönderilebilir. İki kumandaya birden göndermek için `HapticsUtility.SendHapticImpulse(amplitude, duration, HapticsUtility.Controller.Both)` kullan — namespace `UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics`.
 
 ---
 
