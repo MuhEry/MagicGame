@@ -38,6 +38,10 @@ static class MainSceneBuilder
     const string k_XrOriginPrefab =
         "Assets/Samples/XR Interaction Toolkit/3.4.1/Hands Interaction Demo/Prefabs/XR Origin Hands (XR Rig).prefab";
 
+    // GECICI placeholder. Projede baska wav yok ve "kendi basina dosya indirme"
+    // kurali var. Gercek dusme sesi gelince Inspector'dan degistirilecek.
+    const string k_DropClipPath = "Assets/VRTemplateAssets/Audio/Button_14_hover.wav";
+
     // Sartname: locomotion yok, sadece snap turn. Adinda bunlardan biri gecen
     // bilesenler kapatilir. Tip adiyla eslestiriyoruz ki XRI'in namespace
     // degisikliklerinden etkilenmesin (2.x -> 3.x'te bunlar yer degistirdi).
@@ -87,6 +91,7 @@ static class MainSceneBuilder
         PlaceCabinets();
 
         var spawner = CreateSystems(spawnPoint, out var shiftManager);
+        SetUpChimneyEffect(spawnPoint, spawner);
         CreateHud(shiftManager);
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -133,8 +138,46 @@ static class MainSceneBuilder
         chimney.transform.position = new Vector3(0f, 1.5f, 0.7f);
         spawnPoint = chimney.transform;
 
-        // TODO: Bacadan duserken ses + isik efekti buraya eklenecek
-        //       (ItemSpawner.SpawnNext icinden tetiklenmeli).
+        // Baca efektinin isik ve ses kaynaklari. ChimneyEffect bilesenini
+        // spawner olustuktan sonra SetUpChimneyEffect bagliyor.
+        var light = chimney.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = new Color(1f, 0.85f, 0.55f);
+        light.range = 3.5f;
+        light.intensity = 0f;
+        light.enabled = false;
+
+        var audio = chimney.AddComponent<AudioSource>();
+        audio.playOnAwake = false;
+        audio.spatialBlend = 1f; // 3D - ses bacadan gelsin, oyuncu yonu duysun
+        audio.minDistance = 0.6f;
+        audio.maxDistance = 8f;
+    }
+
+    /// <summary>
+    /// Bacadan esya duserken ses + isik. ItemSpawner.ItemSpawned event'ine baglanir.
+    /// </summary>
+    static void SetUpChimneyEffect(Transform spawnPoint, ItemSpawner spawner)
+    {
+        if (spawnPoint == null)
+            return;
+
+        var effect = spawnPoint.gameObject.AddComponent<ChimneyEffect>();
+
+        var dropClip = AssetDatabase.LoadAssetAtPath<AudioClip>(k_DropClipPath);
+        if (dropClip == null)
+            Debug.LogWarning("[Main] Baca dusme sesi bulunamadi: " + k_DropClipPath +
+                             " - isik calisir, ses sessiz kalir.");
+        else
+            Debug.Log("[Main] Baca sesi PLACEHOLDER olarak baglandi (" + Path.GetFileName(k_DropClipPath) +
+                      "). Gercek dusme sesi gelince Inspector'dan degistir.");
+
+        var so = new SerializedObject(effect);
+        so.FindProperty("m_Spawner").objectReferenceValue = spawner;
+        so.FindProperty("m_Light").objectReferenceValue = spawnPoint.GetComponent<Light>();
+        so.FindProperty("m_AudioSource").objectReferenceValue = spawnPoint.GetComponent<AudioSource>();
+        so.FindProperty("m_DropClip").objectReferenceValue = dropClip;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     static void CreateInteractionManager()

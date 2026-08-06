@@ -31,6 +31,12 @@ public class ItemSpawner : MonoBehaviour
     private System.Random random;
     private int nextQueueIndex;
 
+    /// <summary>
+    /// Bacadan bir esya dustugu anda tetiklenir. Ses/isik gibi sunum efektleri
+    /// bu event'e baglanir - kimse Update icinde spawner'i yoklamaz (mimari kural 7).
+    /// </summary>
+    public event Action<GameObject> ItemSpawned;
+
     public bool IsSpawning { get; private set; }
     public GameObject CurrentSpawnedItem { get; private set; }
 
@@ -105,6 +111,9 @@ public class ItemSpawner : MonoBehaviour
         // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
         CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
+
+        ItemSpawned?.Invoke(CurrentSpawnedItem);
+
         return CurrentSpawnedItem;
     }
 
