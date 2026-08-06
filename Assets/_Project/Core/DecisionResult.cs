@@ -6,4 +6,5 @@ public struct DecisionResult
     public bool isCorrect;
     public float inspectMs;
     public string explanation;
+    public int shakeCount;
 }
