@@ -41,6 +41,11 @@ public class CategorySocket : XRSocketInteractor
     [SerializeField]
     Transform m_EjectDirectionSource;
 
+    [Header("Geri bildirim")]
+    [Tooltip("Bos birakilirsa ust objelerde aranir (genelde dolap kokunde durur).")]
+    [SerializeField]
+    FeedbackController m_Feedback;
+
     /// <summary>Bu dolabin kabul ettigi kategori.</summary>
     public ItemCategory acceptedCategory
     {
@@ -57,6 +62,15 @@ public class CategorySocket : XRSocketInteractor
     //            ItemProbe (A) veya ShiftManager (C) daha dogru bir deger verirse
     //            asagidaki hover tabanli olcum onunla degistirilecek.
     float m_HoverStartTime = -1f;
+
+    /// <inheritdoc />
+    protected override void Awake()
+    {
+        base.Awake();
+
+        if (m_Feedback == null)
+            m_Feedback = GetComponentInParent<FeedbackController>();
+    }
 
     /// <inheritdoc />
     public override bool CanSelect(IXRSelectInteractable interactable)
@@ -83,7 +97,9 @@ public class CategorySocket : XRSocketInteractor
         if (m_HoverStartTime < 0f)
             m_HoverStartTime = Time.time;
 
-        // TODO(Adim 3): Hover highlight buraya baglanacak - dolabin agzinda hafif parilti.
+        // Sartname madde 4: esya sokete yaklasinca dolabin agzinda hafif highlight.
+        if (m_Feedback != null)
+            m_Feedback.SetHover(true);
     }
 
     /// <inheritdoc />
@@ -94,7 +110,8 @@ public class CategorySocket : XRSocketInteractor
         if (!hasHover)
             m_HoverStartTime = -1f;
 
-        // TODO(Adim 3): Hover highlight kapatilacak.
+        if (m_Feedback != null)
+            m_Feedback.SetHover(hasHover);
     }
 
     /// <inheritdoc />
@@ -139,8 +156,11 @@ public class CategorySocket : XRSocketInteractor
             $"inceleme={inspectMs:F0} ms",
             this);
 
-        // TODO(Adim 2): FeedbackController.Play(isCorrect) buraya baglanacak
-        //               (gorsel + isitsel + haptik ayni anda).
+        // Uc kanal ayni anda: gorsel (0,3 sn emissive) + isitsel + haptik.
+        if (m_Feedback != null)
+            m_Feedback.PlayDecision(isCorrect);
+        else
+            Debug.LogWarning($"[CategorySocket] '{name}' uzerinde FeedbackController yok - sadece log var.", this);
 
         if (!isCorrect)
         {

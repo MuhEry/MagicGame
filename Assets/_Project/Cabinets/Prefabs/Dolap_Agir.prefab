@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &6603802900493004658
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 68612964430678251, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6714363599175883076, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_AcceptedCategory
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7039773338446492500, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: m_Name
+      value: Dolap_Agir
+      objectReference: {fileID: 0}
+    - target: {fileID: 8782151212628837532, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: a7cdaf387490c8640b5076d210947c7a, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 17511157d7619e5448e1bcddac525edc, type: 3}
