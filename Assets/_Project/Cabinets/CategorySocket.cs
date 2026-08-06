@@ -61,6 +61,9 @@ public class CategorySocket : XRSocketInteractor
     // Yanlis esya disari atilirken baska bir esyayi iceri almamak icin kilit.
     bool m_Rejecting;
     Coroutine m_RejectRoutine;
+
+    // Dogru esya tuketilirken (geri bildirim + yok etme) ayni kilit.
+    bool m_Accepting;
     Coroutine m_AcceptRoutine;
 
     // Inceleme suresi olcumu: esya bu soketin agzina yaklastigi anda baslar.
@@ -79,6 +82,19 @@ public class CategorySocket : XRSocketInteractor
     }
 
     /// <inheritdoc />
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+
+        // Soket devre disi kalirsa coroutine'ler oldurulur ama bayraklar kalir.
+        // Sifirlanmazsa dolap tekrar acildiginda kilitli kalir ve hicbir esya kabul etmez.
+        m_Rejecting = false;
+        m_Accepting = false;
+        m_RejectRoutine = null;
+        m_AcceptRoutine = null;
+    }
+
+    /// <inheritdoc />
     public override bool CanSelect(IXRSelectInteractable interactable)
     {
         // DIKKAT: Burada BILEREK kategori filtresi YOK.
@@ -90,6 +106,11 @@ public class CategorySocket : XRSocketInteractor
         // (Su an reddedilmekte olan esya icin true donmeye devam etmeliyiz, yoksa
         //  XRI onu aninda birakir ve 0,4 sn'lik bekleme calismaz.)
         if (m_Rejecting && !IsSelecting(interactable))
+            return false;
+
+        // Ayni sey dogru esya tuketilirken de gecerli: 0,3 sn'lik geri bildirim
+        // penceresinde araya baska bir esya girmesin.
+        if (m_Accepting && !IsSelecting(interactable))
             return false;
 
         return true;
@@ -170,9 +191,13 @@ public class CategorySocket : XRSocketInteractor
 
         if (isCorrect)
         {
-            if (m_AcceptRoutine != null)
-                StopCoroutine(m_AcceptRoutine);
-            m_AcceptRoutine = StartCoroutine(AcceptRoutine(interactable));
+            // Zaten bir esya tuketiliyorsa rutini YENIDEN BASLATMA.
+            // Eski kod burada StopCoroutine cagiriyordu: soket, esyayi biraktiktan
+            // sonraki bir karelik boslukta ayni esyayi tekrar yakaliyor, bu yeniden
+            // giris rutini Destroy satirina varmadan olduruyordu. Sonuc: esya hic
+            // yok olmuyor ve arka arkaya "DOGRU" sinyali basiliyordu.
+            if (m_AcceptRoutine == null)
+                m_AcceptRoutine = StartCoroutine(AcceptRoutine(interactable));
         }
         else
         {
@@ -242,19 +267,31 @@ public class CategorySocket : XRSocketInteractor
     /// </summary>
     IEnumerator AcceptRoutine(IXRSelectInteractable interactable)
     {
+        m_Accepting = true;
+
+        var itemTransform = interactable?.transform;
+
         if (m_AcceptDelay > 0f)
             yield return new WaitForSeconds(m_AcceptDelay);
 
-        var itemTransform = interactable?.transform;
+        // ONEMLI SIRA: esyayi ONCE etkilesim disina al, SONRA birak.
+        // Devre disi birakilan bir interactable XRI'dan otomatik olarak cikar ve
+        // secim iptal edilir. Boylece "birakma" ile "yok etme" arasindaki karede
+        // soket ayni esyayi TEKRAR yakalayamaz.
+        if (itemTransform != null)
+            itemTransform.gameObject.SetActive(false);
 
         if (interactionManager != null && interactable != null && IsSelecting(interactable))
             interactionManager.SelectExit(this, interactable);
 
         yield return null;
 
+        // TODO(Faz 2): Agda Destroy dogrudan kullanilamaz; nesne yasam dongusu
+        //              ItemSpawner uzerinden despawn edilmeli (mimari kural 3).
         if (itemTransform != null)
             Destroy(itemTransform.gameObject);
 
+        m_Accepting = false;
         m_AcceptRoutine = null;
     }
 

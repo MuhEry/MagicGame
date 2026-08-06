@@ -10,7 +10,7 @@ using UnityEngine;
 public class TelemetryLogger : MonoBehaviour
 {
     private const string Header =
-        "zaman_damgasi,oturum_id,esya_id,dogru_kategori,secilen_kategori,dogru_mu,inceleme_suresi_ms,sallanma_sayisi";
+        "zaman_damgasi,oturum_id,esya_id,dogru_kategori,secilen_kategori,dogru_mu,inceleme_suresi_ms,sallama_sayisi";
 
     [SerializeField] private ShiftManager shiftManager;
 

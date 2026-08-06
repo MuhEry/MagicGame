@@ -56,7 +56,12 @@ public class ItemProbe : MonoBehaviour
             return;
 
         ItemData data = itemIdentity.ItemData;
-        bool isSelected = grabInteractable != null && grabInteractable.isSelected;
+
+        // "Ele alinmayan obje sallanmaz."
+        // grabInteractable.isSelected, esyayi DOLABIN SOKETI tuttugunda da true doner.
+        // Uc yoklama kanali da yalnizca esya bir ELDE iken calismali; bu yuzden
+        // soket disindaki bir interactor ariyoruz.
+        bool isSelected = IsHeldByHand();
 
         // --- 1. Shaking Channel (Sesli) ---
         if (data.category == ItemCategory.Sesli)
@@ -121,6 +126,25 @@ public class ItemProbe : MonoBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Esya bir EL tarafindan mi tutuluyor? Soket (XRSocketInteractor) tutuyorsa false doner.
+    /// </summary>
+    private bool IsHeldByHand()
+    {
+        if (grabInteractable == null || !grabInteractable.isSelected)
+            return false;
+
+        foreach (IXRSelectInteractor interactor in grabInteractable.interactorsSelecting)
+        {
+            if (interactor is XRSocketInteractor)
+                continue;
+
+            return true;
+        }
+
+        return false;
     }
 
     private void PlayRattle(AudioClip clip)

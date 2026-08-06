@@ -25,6 +25,10 @@ public class FeedbackController : MonoBehaviour
 {
     static readonly int k_EmissionColor = Shader.PropertyToID("_EmissionColor");
 
+    // Ses varyasyonu ve nadir klip icin paylasilan uretici.
+    // UnityEngine.Random KULLANILMIYOR - mimari kural 4.
+    static readonly System.Random s_Random = new System.Random();
+
     [Header("Gorsel")]
     [Tooltip("Dolabin govdesindeki Renderer. Bos birakilirsa cocuklardan ilki bulunur.")]
     [SerializeField]
@@ -61,6 +65,19 @@ public class FeedbackController : MonoBehaviour
 
     [SerializeField]
     AudioClip m_WrongClip;
+
+    [Tooltip("Ayni klip ust uste calinca robotik durmasin diye perde (pitch) sapmasi. 0 = kapali.")]
+    [SerializeField, Range(0f, 0.5f)]
+    float m_PitchJitter = 0.08f;
+
+    [Header("Paskalya yumurtasi")]
+    [Tooltip("Bos birakilabilir. Atanirsa YANLIS kararlarda dusuk ihtimalle bunu calar.")]
+    [SerializeField]
+    AudioClip m_RareClip;
+
+    [Tooltip("Nadir klibin calma ihtimali. 0,01 = %1 (yuzde bir).")]
+    [SerializeField, Range(0f, 1f)]
+    float m_RareClipChance = 0.01f;
 
     [Header("Haptik (sartname degerleri)")]
     [SerializeField, Range(0f, 1f)]
@@ -107,9 +124,7 @@ public class FeedbackController : MonoBehaviour
         m_FlashRoutine = StartCoroutine(FlashRoutine(isCorrect ? m_CorrectColor : m_WrongColor));
 
         // 2) Isitsel
-        var clip = isCorrect ? m_CorrectClip : m_WrongClip;
-        if (m_AudioSource != null && clip != null)
-            m_AudioSource.PlayOneShot(clip);
+        PlayClip(isCorrect);
 
         // 3) Haptik
         // Soket, esyayi hangi elin tuttugunu bilmez -> iki kumandaya da gonderiyoruz.
@@ -139,6 +154,29 @@ public class FeedbackController : MonoBehaviour
 
         m_Hovering = hovering;
         ApplyIdleEmission();
+    }
+
+    void PlayClip(bool isCorrect)
+    {
+        if (m_AudioSource == null)
+            return;
+
+        var clip = isCorrect ? m_CorrectClip : m_WrongClip;
+
+        // Nadir klip: yalnizca YANLIS kararlarda, dusuk ihtimalle.
+        if (!isCorrect && m_RareClip != null && s_Random.NextDouble() < m_RareClipChance)
+            clip = m_RareClip;
+
+        if (clip == null)
+            return;
+
+        // Perde sapmasi: ayni ses arka arkaya calinca kulak tirmalamasin.
+        // UnityEngine.Random KULLANILMIYOR (mimari kural 4).
+        m_AudioSource.pitch = m_PitchJitter > 0f
+            ? 1f + (float)((s_Random.NextDouble() * 2.0 - 1.0) * m_PitchJitter)
+            : 1f;
+
+        m_AudioSource.PlayOneShot(clip);
     }
 
     IEnumerator FlashRoutine(Color color)
