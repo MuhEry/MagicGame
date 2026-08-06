@@ -142,9 +142,9 @@ public class CategorySocket : XRSocketInteractor
 
         var isCorrect = itemCategory == m_AcceptedCategory;
 
-        // A'nin ItemProbe'u henuz gelmedi. Test kupleri icin sallama sayisi 0'dır;
-        // A'nin gercek ItemIdentity/ItemProbe entegrasyonunda bu deger oradan okunacak.
-        const int shakeCount = 0;
+        // Gerçek eşyalarda A'nın ItemProbe'u sallama sayısını sağlar.
+        // B'nin geçici test küplerinde ItemProbe olmadığından değer 0 kalır.
+        int shakeCount = GetShakeCount(interactable);
 
         if (ShiftManager.Instance != null && ShiftManager.Instance.State == ShiftState.Vardiya)
         {
@@ -209,21 +209,14 @@ public class CategorySocket : XRSocketInteractor
         if (interactable == null)
             return false;
 
-        // ------------------------------------------------------------------
-        // TODO: A'nin ItemIdentity + ItemData'si gelince ILK SIRAYA su dal eklenecek:
-        //
-        //   var identity = interactable.transform.GetComponentInParent<ItemIdentity>();
-        //   if (identity != null && identity.data != null)
-        //   {
-        //       itemId   = identity.id;
-        //       category = identity.data.category;
-        //       itemName = identity.data.displayName;
-        //       return true;
-        //   }
-        //
-        // Assets/_Project/Items/ su an bos - o yuzden simdilik yalnizca
-        // sandbox test kupleri (CabinetTestItem) okunuyor.
-        // ------------------------------------------------------------------
+        var identity = interactable.transform.GetComponentInParent<ItemIdentity>();
+        if (identity != null && identity.ItemData != null)
+        {
+            itemId = identity.ItemId;
+            category = identity.ItemData.category;
+            itemName = identity.ItemData.displayName;
+            return true;
+        }
 
         var testItem = interactable.transform.GetComponentInParent<CabinetTestItem>();
         if (testItem != null)
@@ -235,6 +228,12 @@ public class CategorySocket : XRSocketInteractor
         }
 
         return false;
+    }
+
+    static int GetShakeCount(IXRSelectInteractable interactable)
+    {
+        var probe = interactable?.transform.GetComponentInParent<ItemProbe>();
+        return probe != null ? Mathf.Max(0, probe.ShakeCount) : 0;
     }
 
     /// <summary>
