@@ -163,7 +163,22 @@ basarisiz olur — yanlis alarmdir.
 - Kalici cozum: `Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Plugins/AlterunaDependencyCheck.dll`
   dosyasini `.meta`'siyla birlikte sil. Projede baska hicbir referansi yok.
 
-## Acik sorun: avatar kopyalanmasi (henuz duzeltilmedi)
+## Editorde "VR algilanmiyor" ise: once gozlugu kontrol et
+
+Editor log'unda su varsa proje hatasi YOKTUR, bilgisayara gozluk bagli degildir:
+
+```
+Function: Display_Initialize
+Message: XrResult failure [XR_ERROR_FORM_FACTOR_UNAVAILABLE]
+[FAILURE] xrGetSystem: XR_ERROR_FORM_FACTOR_UNAVAILABLE
+```
+
+`XR_ERROR_FORM_FACTOR_UNAVAILABLE` = OpenXR bagli bir basliık bulamadi. Editorde
+VR ile test etmek icin Quest'in **Link / Air Link** ile bagli ve **Meta Quest Link**
+uygulamasinin acik olmasi, OpenXR runtime'inin da Meta olarak secili olmasi gerekir.
+Aksi halde dogru yol: **Build & Run** ile APK'yi cihaza atmak.
+
+## ~~Acik sorun: avatar kopyalanmasi~~ (COZULDU)
 
 Editorde Play'e basildiginda log'da sunlar cikiyor:
 
@@ -181,15 +196,18 @@ GUID'lerini tasiyor. Klonun kaydi orijinalinkini disari itiyor, sonra orijinal r
 "not registered" diyerek senkron gonderemez hale geliyor. Ayrica sahnede iki kamera
 ve iki AudioListener olusuyor.
 
-**Iki secenek** (ikisi de cihazda test edilmeli, bu yuzden simdilik dokunulmadi):
+**Cozum:** Alteruna'nin kendi ornek sahnesi incelendi. Orada avatar sablonu **PASIF**
+duruyor — `XR Avatar Rig` nesnesinin `m_IsActive` override'i **0**. Pasif oldugu icin
+`CommunicationBridgeUID.OnEnable` hic calismaz, rig kendi UID'siyle kaydolmaz ve klonla
+cakisma olusmaz. Dokumantasyon da bunu destekliyor: *"Each synchronizable receives a
+unique global identifier ... to prevent collisions."*
 
-| Secenek | Nasil | Riski |
-|---|---|---|
-| A. Avatar sablonunu ayirmak | Rig'in bir **prefab varligi** kopyasini cikar, `AvatarPrefab` onu gostersin. Sahnedeki rig yerel oyuncu olarak kalir | Yerel rig Alteruna'nin avatar sistemine dahil olmaz; diger oyuncu seni gorur mu, test gerekir |
-| B. Alteruna'nin desenine tam uymak | Sahnedeki rig'i **avatar sablonu** yap ve Alteruna herkes icin (senin icin de) spawn etsin | Oda yokken sahnede rig olmaz -> **cevrimdisi oyun bozulur** |
+Bizim rig de artik pasif (`Multiplayer Kurulumunu Uygula` bunu otomatik yapar).
+Cevrimdisi oyun bozulmasin diye `OfflineRigFallback` eklendi: belirlenen sure boyunca
+odaya girilemezse rig'i yerel olarak acar, sonradan odaya girilirse tekrar kapatir.
 
-Alteruna'nin kendi ornek sahnesi (`Assets/Multiplayer XR Template/Scenes/XR Interaction.unity`)
-B desenini kullaniyor. Karar ekipte; secildikten sonra kontrol listesine de bir madde eklenmeli.
+Sahnede rig'in **soluk** (pasif) gorunmesi artik DOGRU haldir; oyuncu rig'ini
+Alteruna spawn eder.
 
 ## Bilinen sinirlar
 

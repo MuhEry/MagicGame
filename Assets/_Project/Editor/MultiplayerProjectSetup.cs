@@ -139,7 +139,7 @@ public static class MultiplayerProjectSetup
             GetOrAdd<AlterunaComponents.MultiplayerManager>(multiplayerGo);
         GetOrAdd<Alteruna.AutoJoin>(multiplayerGo);
 
-        GameObject rig = GameObject.Find("XR Origin Hands (XR Rig)");
+        GameObject rig = FindRig();
         if (rig == null)
             throw new System.InvalidOperationException("XR Origin Hands (XR Rig) bulunamadı.");
 
@@ -188,12 +188,60 @@ public static class MultiplayerProjectSetup
             avatarPrefab.objectReferenceValue = avatar;
         managerSo.ApplyModifiedPropertiesWithoutUndo();
 
+        ConfigureAvatarTemplate(systems, rig);
+
         EditorUtility.SetDirty(manager);
         EditorUtility.SetDirty(networkSpawner);
         EditorUtility.SetDirty(coordinator);
         EditorUtility.SetDirty(itemSpawner);
         EditorUtility.SetDirty(shiftManager);
         EditorSceneManager.MarkSceneDirty(scene);
+    }
+
+    /// <summary>
+    /// Sahnedeki rig, Alteruna icin bir avatar SABLONUDUR ve PASIF durmalidir.
+    /// Alteruna'nin kendi ornek sahnesinde de oyle: "XR Avatar Rig" nesnesinin
+    /// m_IsActive override'i 0. Sablon aktif kalirsa kendi UID'siyle kaydolur,
+    /// Alteruna onu klonlayinca ayni UID iki nesnede olur ve orijinal rig
+    /// "Synchronizable not registered" ile senkron gonderemez hale gelir;
+    /// ayrica sahnede iki kamera ve iki AudioListener kalir.
+    /// </summary>
+    static void ConfigureAvatarTemplate(GameObject systems, GameObject rig)
+    {
+        if (rig.activeSelf)
+        {
+            rig.SetActive(false);
+            Debug.Log("[MultiplayerProjectSetup] XR rig avatar SABLONU olarak pasiflestirildi " +
+                      "(Alteruna ornek sahnesindeki desen). Oyuncu rig'ini Alteruna spawn eder.");
+        }
+
+        OfflineRigFallback fallback = GetOrAdd<OfflineRigFallback>(systems);
+        SerializedObject fallbackSo = new SerializedObject(fallback);
+        SerializedProperty template = fallbackSo.FindProperty("rigTemplate");
+        if (template != null)
+            template.objectReferenceValue = rig;
+        fallbackSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(fallback);
+    }
+
+    /// <summary>
+    /// GameObject.Find yalnizca AKTIF nesneleri bulur. Rig artik sablon oldugu icin
+    /// pasif duruyor; pasifleri de tarayan bir arama sart.
+    /// </summary>
+    public static GameObject FindRig()
+    {
+        GameObject direct = GameObject.Find("XR Origin Hands (XR Rig)");
+        if (direct != null)
+            return direct;
+
+        foreach (Transform candidate in Object.FindObjectsByType<Transform>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (candidate.parent == null && candidate.name == "XR Origin Hands (XR Rig)")
+                return candidate.gameObject;
+        }
+
+        return null;
     }
 
     static void AddTransformSync(GameObject root, string childName)
