@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using Alteruna.Multiplayer.Unity;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,34 +10,22 @@ public static class MultiplayerExperienceSetup
 {
     const string MainScenePath = "Assets/_Project/Scenes/Main.unity";
 
-    [InitializeOnLoadMethod]
-    static void ScheduleSetup()
-    {
-        EditorApplication.update -= TryApplySetup;
-        EditorApplication.update += TryApplySetup;
-    }
+    // MultiplayerProjectSetup ile ayni gerekce: sahneyi acilista kendiliginden
+    // degistirip kaydeden [InitializeOnLoadMethod] kaldirildi. Yalnizca menuden calisir.
 
-    [MenuItem("Tools/Gece Vardiyası/Oyuncu Konumları ve HUD Kurulumunu Uygula")]
+    [MenuItem("Tools/Gece Vardiyası/Oyuncu Konumları ve HUD Kurulumunu Uygula", false, 41)]
     public static void ApplyFromMenu()
     {
         ApplySetup(true);
     }
 
-    static void TryApplySetup()
+    /// <summary>MainSceneBuilder sahneyi sifirdan kurduktan sonra bunu cagirir.</summary>
+    public static void ApplySetupSilently()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode ||
-            EditorApplication.isCompiling || EditorApplication.isUpdating)
-            return;
-
-        if (SceneManager.GetActiveScene().path != MainScenePath)
-            return;
-
-        EditorApplication.update -= TryApplySetup;
-        if (!SetupLooksComplete())
-            ApplySetup(false);
+        ApplySetup(false);
     }
 
-    static bool SetupLooksComplete()
+    public static bool SetupLooksComplete()
     {
         GameObject hud1 = GameObject.Find("HUD_Player1");
         GameObject hud2 = GameObject.Find("HUD_Player2");
@@ -72,6 +61,7 @@ public static class MultiplayerExperienceSetup
             return;
         }
 
+        RemoveOrphanHudCanvases();
         ConfigurePlayerHudPair(scene);
         ConfigureSpawnPoints();
         if (GameObject.Find("PlayerExperienceSetup_v2") == null)
@@ -127,6 +117,90 @@ public static class MultiplayerExperienceSetup
             localHud = hud.AddComponent<LocalPlayerHud>();
         localHud.ConfigureSlot(slot);
         EditorUtility.SetDirty(localHud);
+
+        ConfigureDiagnostics(hud);
+    }
+
+    /// <summary>
+    /// Ag teshis satiri. Varsayilan olarak KAPALI durur; gozlukte sorun aranirken
+    /// Inspector'dan showOnStart isaretlenir. Odaya girilip girilmedigini,
+    /// host mu istemci mi olundugunu ve seed'i cihazda gosterir.
+    /// </summary>
+    static void ConfigureDiagnostics(GameObject hud)
+    {
+        RectTransform hudRect = hud.GetComponent<RectTransform>();
+        if (hudRect == null)
+            return;
+
+        Transform existing = hudRect.Find("Txt_AgTeshis");
+        TextMeshProUGUI label;
+        if (existing != null)
+        {
+            label = existing.GetComponent<TextMeshProUGUI>();
+        }
+        else
+        {
+            GameObject labelGo = new GameObject("Txt_AgTeshis", typeof(RectTransform));
+            labelGo.transform.SetParent(hudRect, false);
+            RectTransform labelRect = (RectTransform)labelGo.transform;
+            labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            labelRect.pivot = new Vector2(0.5f, 0.5f);
+            labelRect.anchoredPosition = new Vector2(0f, -270f);
+            labelRect.sizeDelta = new Vector2(940f, 150f);
+
+            label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.fontSize = 24f;
+            label.alignment = TextAlignmentOptions.TopLeft;
+            label.color = new Color(0.75f, 0.9f, 1f);
+            label.text = "-";
+        }
+
+        if (label == null)
+            return;
+
+        NetworkDiagnosticsHud diagnostics = hud.GetComponent<NetworkDiagnosticsHud>();
+        if (diagnostics == null)
+            diagnostics = hud.AddComponent<NetworkDiagnosticsHud>();
+
+        SerializedObject diagnosticsSo = new SerializedObject(diagnostics);
+        diagnosticsSo.FindProperty("targetText").objectReferenceValue = label;
+        diagnosticsSo.FindProperty("shiftManager").objectReferenceValue =
+            Object.FindFirstObjectByType<ShiftManager>();
+        diagnosticsSo.FindProperty("itemSpawner").objectReferenceValue =
+            Object.FindFirstObjectByType<ItemSpawner>();
+        diagnosticsSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(diagnostics);
+    }
+
+    /// <summary>
+    /// Sahnede birikmis, hicbir metni bagli olmayan HUD kopyalarini siler
+    /// (orn. "HUDCabinet"). Bunlar ShiftManager olaylarina abone oluyor ama
+    /// hicbir sey gostermiyor; sahne panelini okumayi zorlastiriyorlardi.
+    /// </summary>
+    static void RemoveOrphanHudCanvases()
+    {
+        foreach (ShiftHudPresenter presenter in
+                 Object.FindObjectsByType<ShiftHudPresenter>(FindObjectsSortMode.None))
+        {
+            if (presenter == null)
+                continue;
+
+            GameObject hud = presenter.gameObject;
+            if (hud.name == "HUD" || hud.name == "HUD_Player1" || hud.name == "HUD_Player2")
+                continue;
+
+            SerializedObject so = new SerializedObject(presenter);
+            bool hasAnyBinding =
+                so.FindProperty("remainingTimeText").objectReferenceValue != null ||
+                so.FindProperty("scoreText").objectReferenceValue != null ||
+                so.FindProperty("reportText").objectReferenceValue != null;
+
+            if (hasAnyBinding)
+                continue;
+
+            Debug.Log($"[MultiplayerExperienceSetup] Bos HUD kopyasi silindi: {hud.name}");
+            Object.DestroyImmediate(hud);
+        }
     }
 
     static void ConfigureSpawnPoints()

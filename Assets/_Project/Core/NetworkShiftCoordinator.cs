@@ -6,8 +6,11 @@ using Alteruna.Multiplayer.Unity.EventArgument;
 using UnityEngine;
 
 /// <summary>
-/// Host-authoritative bridge between the local game loop and Alteruna.
-/// Offline play remains available until a room has actually been joined.
+/// Yerel oyun donguse ile Alteruna arasindaki host-otoriter kopru.
+/// Odaya GERCEKTEN girilene kadar oyun cevrimdisi calismaya devam eder.
+///
+/// Mimari kural 1 ve 2 (sartname): skor/sure/kalan esya yalnizca ShiftManager'da tutulur,
+/// her durum degisikligi tek bir metottan gecer. Bu sinif o metotlari aga tasir.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class NetworkShiftCoordinator : AttributesSync
@@ -21,6 +24,7 @@ public sealed class NetworkShiftCoordinator : AttributesSync
 
     int hostSessionSequence;
     int hostDecisionSequence;
+    int hostSeed;
     int lastAppliedSession;
     int lastAppliedDecision;
     int lastRequestedItemId = int.MinValue;
@@ -32,6 +36,25 @@ public sealed class NetworkShiftCoordinator : AttributesSync
     public bool IsInRoom { get; private set; }
     public bool IsHost { get; private set; }
     public bool HasAuthority => !IsInRoom || IsHost;
+
+    /// <summary>Teshis paneli icin: odadaki kullanici sayisi (odada degilken 0).</summary>
+    public int UserCount { get; private set; }
+
+    /// <summary>Teshis paneli icin: bu cihazin Alteruna kullanici indeksi.</summary>
+    public int LocalUserIndex { get; private set; } = -1;
+
+    /// <summary>Teshis paneli icin: Multiplayer bileseni bulunup abone olundu mu.</summary>
+    public bool IsBridgeReady => subscribed;
+
+    /// <summary>Vardiya boyunca esyalarin uretildigi seed. Host uretir, istemci alir.</summary>
+    public int ActiveSeed => hostSeed;
+
+    /// <summary>
+    /// Bir esya tuketildiginde (dogru dolaba yerlesti) TUM istemcilerde tetiklenir.
+    /// Static: dolaplar sahne yuklenirken koordinator henuz olusmamis olabilir,
+    /// ornek referansina bagli abonelik sessizce kurulmuyordu.
+    /// </summary>
+    public static event Action<int> ItemConsumed;
 
     void Awake()
     {
@@ -60,6 +83,13 @@ public sealed class NetworkShiftCoordinator : AttributesSync
 
     void Update()
     {
+        // CommunicationBridge.Multiplayer sahnedeki MultiplayerManager'dan cozulur.
+        // Start() aninda henuz hazir degilse ESKI KOD BIR DAHA HIC DENEMIYORDU:
+        // abonelik kurulmuyor, OnRoomJoined hic gelmiyor, IsInRoom sonsuza kadar
+        // false kaliyor ve iki gozluk de sessizce CEVRIMDISI oynuyordu.
+        if (!subscribed)
+            Subscribe();
+
         if (!IsInRoom || !IsHost || shiftManager == null ||
             shiftManager.State != ShiftState.Vardiya || Time.unscaledTime < nextClockBroadcast)
             return;
@@ -100,6 +130,19 @@ public sealed class NetworkShiftCoordinator : AttributesSync
                 itemId, (int)reportedCorrect, (int)chosen, inspectMs, shakeCount);
     }
 
+    /// <summary>
+    /// Dogru karar sonrasi esyanin TUM istemcilerde ayni sekilde ortadan kalkmasini saglar.
+    /// Yalnizca host yayinlar; istemciler ApplyItemConsumed uzerinden ayni isi yapar.
+    /// Odada degilsek hicbir sey gonderilmez, cevrimdisi oyun etkilenmez.
+    /// </summary>
+    public void BroadcastItemConsumed(int itemId)
+    {
+        if (!IsInRoom || !IsHost)
+            return;
+
+        InvokeRemoteMethod(nameof(ApplyItemConsumed), UserId.All, itemId);
+    }
+
     public void HostLanSession()
     {
         Multiplayer.Host();
@@ -125,10 +168,10 @@ public sealed class NetworkShiftCoordinator : AttributesSync
     void BeginAuthoritativeShift()
     {
         hostSessionSequence++;
-        int seed = Environment.TickCount ^ (hostSessionSequence * 397);
+        hostSeed = Environment.TickCount ^ (hostSessionSequence * 397);
 
-        ApplyStart(hostSessionSequence, seed);
-        InvokeRemoteMethod(nameof(ApplyStart), UserId.All, hostSessionSequence, seed);
+        ApplyStart(hostSessionSequence, hostSeed);
+        InvokeRemoteMethod(nameof(ApplyStart), UserId.All, hostSessionSequence, hostSeed);
     }
 
     [SynchronizableMethod]
@@ -139,6 +182,7 @@ public sealed class NetworkShiftCoordinator : AttributesSync
 
         lastAppliedSession = sessionSequence;
         lastAppliedDecision = 0;
+        hostSeed = seed;
         ResolveReferences();
         shiftManager?.StartShiftFromNetwork(seed, IsHost);
     }
@@ -156,8 +200,8 @@ public sealed class NetworkShiftCoordinator : AttributesSync
         if (!IsHost || shiftManager == null || shiftManager.State != ShiftState.Vardiya)
             return;
 
-        // Both clients can observe the same socket event. Collapse only the near-simultaneous duplicate;
-        // a rejected item can still be tried again after it has been ejected.
+        // Iki istemci de ayni soket olayini gorebilir. Yalnizca es zamanli kopyayi
+        // eliyoruz; reddedilen esya disari atildiktan sonra tekrar denenebilmeli.
         if (itemId == lastRequestedItemId && chosen == lastRequestedChoice &&
             Time.unscaledTime - lastRequestTime < duplicateDecisionWindow)
             return;
@@ -170,12 +214,12 @@ public sealed class NetworkShiftCoordinator : AttributesSync
         ItemIdentity identity = current != null ? current.GetComponentInChildren<ItemIdentity>() : null;
         if (identity == null || identity.ItemData == null || identity.ItemId != itemId)
         {
-            Debug.LogWarning($"[Network] Geçersiz karar isteği reddedildi. itemId={itemId}", this);
+            Debug.LogWarning($"[Network] Gecersiz karar istegi reddedildi. itemId={itemId}", this);
             return;
         }
 
-        // Ağdaki istemcinin bildirdiği doğru kategoriye güvenme. Kararı her zaman
-        // host'un gerçekten ürettiği nesnenin çalışma zamanı verisinden doğrula.
+        // Agdaki istemcinin bildirdigi dogru kategoriye guvenme. Karari her zaman
+        // host'un gercekten urettigi nesnenin calisma zamani verisinden dogrula.
         ItemCategory verifiedCorrect = identity.ItemData.category;
 
         hostDecisionSequence++;
@@ -198,6 +242,12 @@ public sealed class NetworkShiftCoordinator : AttributesSync
     }
 
     [SynchronizableMethod]
+    void ApplyItemConsumed(int itemId)
+    {
+        ItemConsumed?.Invoke(itemId);
+    }
+
+    [SynchronizableMethod]
     void ApplyClock(float remainingSeconds)
     {
         if (!IsHost)
@@ -214,25 +264,52 @@ public sealed class NetworkShiftCoordinator : AttributesSync
     void HandleRoomJoined(RoomJoinedEvent args)
     {
         IsInRoom = true;
-        IsHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
+        RefreshRole();
         nextClockBroadcast = 0f;
-        Debug.Log($"[Network] Odaya katılındı. Rol: {(IsHost ? "HOST" : "CLIENT")}", this);
+        Debug.Log($"[Network] Odaya katilindi. Rol: {(IsHost ? "HOST" : "ISTEMCI")}, " +
+                  $"kullanici={UserCount}, indeks={LocalUserIndex}", this);
     }
 
     void HandleRoomLeft(RoomLeftEvent _)
     {
         IsInRoom = false;
         IsHost = false;
+        UserCount = 0;
+        Debug.Log("[Network] Odadan cikildi, oyun cevrimdisi moda dondu.", this);
     }
 
     void HandleOtherUserJoined(OtherUserJoinedEvent args)
     {
-        IsHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
+        RefreshRole();
+        Debug.Log($"[Network] Baska bir oyuncu katildi. Toplam kullanici={UserCount}", this);
+
+        // Vardiya devam ederken katilan oyuncu bos ekranda kalmasin: host,
+        // acik oturumu ve saati yeni gelene de yayinlar. ApplyStart zaten
+        // sessionSequence korumasi tasidigi icin mevcut oyunculara zarar vermez.
+        if (!IsHost || shiftManager == null || shiftManager.State != ShiftState.Vardiya)
+            return;
+
+        InvokeRemoteMethod(nameof(ApplyStart), UserId.All, hostSessionSequence, hostSeed);
+        InvokeRemoteMethod(nameof(ApplyClock), UserId.All, shiftManager.RemainingSeconds);
     }
 
     void HandleOtherUserLeft(OtherUserLeftEvent args)
     {
-        IsHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
+        RefreshRole();
+    }
+
+    /// <summary>
+    /// Rolu her zaman Multiplayer bileseninden okur. Olay argumanindaki controller
+    /// tipine bagimli kalmiyoruz; host dusup baskasi devraldiginda da dogru sonuc verir.
+    /// </summary>
+    void RefreshRole()
+    {
+        if (Multiplayer == null)
+            return;
+
+        LocalUserIndex = Multiplayer.Me != null ? Multiplayer.Me.Index : -1;
+        IsHost = LocalUserIndex >= 0 && LocalUserIndex == Multiplayer.LowestUserIndex;
+        UserCount = Multiplayer.CurrentRoom != null ? Multiplayer.CurrentRoom.GetUserCount() : 0;
     }
 
     void HandleShiftStateChanged(ShiftState state)
@@ -252,9 +329,15 @@ public sealed class NetworkShiftCoordinator : AttributesSync
         Multiplayer.OnRoomLeft.AddListener(HandleRoomLeft);
         Multiplayer.OnOtherUserJoined.AddListener(HandleOtherUserJoined);
         Multiplayer.OnOtherUserLeft.AddListener(HandleOtherUserLeft);
+
+        if (shiftManager == null)
+            ResolveReferences();
+
         if (shiftManager != null)
             shiftManager.OnStateChanged += HandleShiftStateChanged;
+
         subscribed = true;
+        Debug.Log("[Network] Alteruna kopru baglandi, oda olaylari dinleniyor.", this);
     }
 
     void Unsubscribe()

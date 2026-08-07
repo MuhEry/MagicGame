@@ -2838,7 +2838,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b03303434c16abe4c8e98e55b50ea659, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemSpawner
-  seed: 555
+  seed: 0
   itemPrefabs:
   - itemId: 303
     prefab: {fileID: 4130499917232436979, guid: a98d4560293d2c64d966564837fbf0ca,
