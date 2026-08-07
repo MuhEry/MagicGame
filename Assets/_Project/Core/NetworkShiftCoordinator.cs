@@ -309,7 +309,8 @@ public sealed class NetworkShiftCoordinator : AttributesSync
 
         LocalUserIndex = Multiplayer.Me != null ? Multiplayer.Me.Index : -1;
         IsHost = LocalUserIndex >= 0 && LocalUserIndex == Multiplayer.LowestUserIndex;
-        UserCount = Multiplayer.CurrentRoom != null ? Multiplayer.CurrentRoom.GetUserCount() : 0;
+        // Room.GetUserCount() 2.1'de obsolete; CurrentUsers ayni degeri verir.
+        UserCount = Multiplayer.CurrentRoom != null ? Multiplayer.CurrentRoom.CurrentUsers : 0;
     }
 
     void HandleShiftStateChanged(ShiftState state)

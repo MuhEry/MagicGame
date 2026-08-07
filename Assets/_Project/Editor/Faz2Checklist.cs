@@ -69,6 +69,33 @@ public static class Faz2Checklist
             "Tamam");
     }
 
+    /// <summary>
+    /// Build Settings'e zamanla ornek sahneler sizabiliyor (orn. XRI Starter Assets
+    /// DemoScene). Fazladan sahne APK'yi sisirir ve yanlis sahnenin acilma riskini
+    /// tasir. Bu komut listeyi yalnizca Main.unity'ye indirger.
+    /// </summary>
+    [MenuItem("Tools/Gece Vardiyası/Build Settings'i Onar (yalnızca Main)", false, 61)]
+    public static void RepairBuildSettings()
+    {
+        string[] removed = EditorBuildSettings.scenes
+            .Select(scene => scene.path)
+            .Where(path => path != MainScenePath)
+            .ToArray();
+
+        EditorBuildSettings.scenes = new[]
+        {
+            new EditorBuildSettingsScene(MainScenePath, true),
+        };
+
+        string message = removed.Length == 0
+            ? "Build Settings zaten yalnizca Main.unity iceriyordu."
+            : "Build Settings artik yalnizca Main.unity iceriyor.\nCikarilanlar:\n- " +
+              string.Join("\n- ", removed);
+
+        Debug.Log("[Faz2] " + message);
+        EditorUtility.DisplayDialog("Build Settings", message, "Tamam");
+    }
+
     // ---------------------------------------------------------------- yardimci
 
     static void Pass(string message) => s_Lines.Add("  [OK]   " + message);
@@ -390,12 +417,23 @@ public static class Faz2Checklist
     {
         s_Lines.Add("8) Build");
 
-        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
-        bool onlyMain = scenes.Length == 1 && scenes[0].enabled && scenes[0].path == MainScenePath;
+        // Yalnizca ETKIN sahneler build'e girer; devre disi birakilmis ornek sahneler
+        // listede durabilir. Onlar icin hata verip yanlis alarm uretme.
+        string[] enabledScenes = EditorBuildSettings.scenes
+            .Where(scene => scene.enabled)
+            .Select(scene => scene.path)
+            .ToArray();
+
+        bool onlyMain = enabledScenes.Length == 1 && enabledScenes[0] == MainScenePath;
         Require(onlyMain,
-            "Build Settings yalnizca Main.unity iceriyor.",
-            "Build Settings Main.unity'yi isaret etmiyor - APK'da bos ekran cikar. " +
-            "Mevcut: " + string.Join(", ", scenes.Select(scene => scene.path)));
+            "Build Settings'te etkin tek sahne Main.unity.",
+            "Build Settings'te etkin sahneler beklenenden farkli - APK yanlis sahneyle acilabilir. " +
+            "Etkin: " + string.Join(", ", enabledScenes));
+
+        int disabledCount = EditorBuildSettings.scenes.Length - enabledScenes.Length;
+        if (disabledCount > 0)
+            Warn($"{disabledCount} devre disi sahne listede duruyor. " +
+                 "Build Settings'i Onar komutu bunlari temizler.");
 
         Require(EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android,
             "Aktif platform Android.",

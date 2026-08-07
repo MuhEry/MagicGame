@@ -16,7 +16,11 @@ Unity'yi ac, `Assets/_Project/Scenes/Main.unity` sahnesini ac ve sirayla:
 |---|---|---|
 | 1 | `Tools > Gece Vardiyası > Multiplayer Kurulumunu Uygula` | MultiplayerManager, AutoJoin, XR rig avatar bilesenleri, Alteruna Spawner, esya prefabi senkronizasyonu |
 | 2 | `Tools > Gece Vardiyası > Oyuncu Konumları ve HUD Kurulumunu Uygula` | Iki oyuncu baslangic noktasi, HUD_Player1 / HUD_Player2, ag teshis satiri |
-| 3 | `Tools > Gece Vardiyası > Faz 2 Kontrol Listesini Doğrula` | Asagidaki her maddeyi tek tek dogrular |
+| 3 | `Tools > Gece Vardiyası > Build Settings'i Onar (yalnızca Main)` | Build listesinden sizmis ornek sahneleri temizler |
+| 4 | `Tools > Gece Vardiyası > Faz 2 Kontrol Listesini Doğrula` | Asagidaki her maddeyi tek tek dogrular |
+
+> **Durum:** Bu adimlar 7 Agustos 2026'da bu makinede calistirildi; kontrol listesi
+> **"Tum zorunlu maddeler tamam (0 uyari)"** dondu. Unity Console 0 hata / 0 uyari.
 
 > Sahne tamamen bozulursa `Tools > Kayıp Eşya > Main Sahnesini Kur` sahneyi sifirdan
 > uretir ve **artik Faz 2 kurulumunu da uygular**. Eskiden bu komut multiplayer'i siliyordu.
@@ -123,7 +127,7 @@ Skoru host tuttugu icin **host cihazin CSV'si** referanstir.
 - [ ] Yanlis yerlestirmede mikro-aciklama panoda gorunuyor
 - [ ] OVR Metrics Tool ile 72 Hz dogrulandi, dusen kare gozlenmedi
 - [ ] telemetry.csv cihazdan cekildi, en az 8 satir ve tum sutunlar dolu
-- [ ] HATA-COZUM.md en az 5 kayit iceriyor *(su an 23 kayit var)*
+- [ ] HATA-COZUM.md en az 5 kayit iceriyor *(su an 25 kayit var)*
 
 ### Faz 2'ye ozel
 - [ ] Iki Quest ayni odada birbirini goruyor (kafa + 2 el)
@@ -132,6 +136,18 @@ Skoru host tuttugu icin **host cihazin CSV'si** referanstir.
 - [ ] Ortak vardiya hedefi iki kisiyle birlikte oynanacak sekilde kurgulandi (kapasite 2)
 
 ---
+
+## "Missing Dependency" penceresi geri gelirse
+
+Her derlemeden sonra **"Alteruna Multiplayer SDK is required but was not detected"**
+penceresi cikiyorsa, birisi `AlterunaDependencyCheck.dll`'i geri getirmis demektir.
+Bu DLL SDK **v1**'in tip adini ariyor, kurulu SDK 2.1 oldugu icin **her zaman**
+basarisiz olur — yanlis alarmdir.
+
+- **`Download`'a BASMAYIN.** SDK'nin ikinci bir kopyasini `Assets/` altina indirir;
+  her Alteruna tipi iki kez tanimlanir (`CS0101`) ve proje hic derlenmez.
+- Kalici cozum: `Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Plugins/AlterunaDependencyCheck.dll`
+  dosyasini `.meta`'siyla birlikte sil. Projede baska hicbir referansi yok.
 
 ## Bilinen sinirlar
 
