@@ -153,7 +153,7 @@ MonoBehaviour:
   - {fileID: -5941725581135416239}
   - {fileID: 7009867266914750043}
   - {fileID: -6024546777161485163}
-  - {fileID: 4325660641313652592}
+  - {fileID: -6350047067895735620}
   - {fileID: -690766299245189921}
   - {fileID: 7751228045368503775}
   - {fileID: 8157482721945908042}
@@ -446,7 +446,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 90ae1e8c3c7a542bba339faf2e771c5a, type: 3}
-  m_Name: AndroidXRSupportFeature Standalone
+  m_Name: AndroidXRSupportFeature Android
   m_EditorClassIdentifier: Unity.XR.AndroidOpenXR::UnityEngine.XR.OpenXR.Features.Android.AndroidXRSupportFeature
   m_enabled: 0
   nameUi: Android XR Support
@@ -1045,8 +1045,8 @@ MonoBehaviour:
   features:
   - {fileID: -26858401202852733}
   - {fileID: 6310755902545545824}
-  - {fileID: 5562333765786175448}
-  - {fileID: -5543639920907004968}
+  - {fileID: 5487315085652391421}
+  - {fileID: -5170624231289186651}
   - {fileID: 4117382365159756022}
   - {fileID: -5686177324229255274}
   - {fileID: 8441450413355064930}
@@ -1057,7 +1057,7 @@ MonoBehaviour:
   - {fileID: -40984751935347744}
   - {fileID: 6693785109949757185}
   - {fileID: 6256046882426700881}
-  - {fileID: 6508531829680340833}
+  - {fileID: 3708807343660529324}
   - {fileID: 2142938838686582127}
   - {fileID: -590851228402724440}
   - {fileID: -3946252854046381403}
@@ -1501,7 +1501,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6c36843bac48b29469f79baf3c98f9b6, type: 3}
-  m_Name: AndroidXRHandMeshData Standalone
+  m_Name: AndroidXRHandMeshData Android
   m_EditorClassIdentifier: Unity.XR.AndroidOpenXR::UnityEngine.XR.OpenXR.Features.Android.AndroidXRHandMeshData
   m_enabled: 0
   nameUi: 'Android XR: Hand Mesh Data'
@@ -1816,7 +1816,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12d3bf61b014a48a2b7564c61da9d7ad, type: 3}
-  m_Name: AndroidXRPerformanceMetrics Standalone
+  m_Name: AndroidXRPerformanceMetrics Android
   m_EditorClassIdentifier: Unity.XR.AndroidOpenXR::UnityEngine.XR.OpenXR.Features.Android.AndroidXRPerformanceMetrics
   m_enabled: 0
   nameUi: Android XR Performance Metrics
@@ -2106,7 +2106,7 @@ MonoBehaviour:
   m_Name: WebGL
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -51630427813541062}
+  - {fileID: -9009533477231897449}
   customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0

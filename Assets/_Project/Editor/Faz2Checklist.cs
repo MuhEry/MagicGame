@@ -252,7 +252,9 @@ public static class Faz2Checklist
     {
         s_Lines.Add("3) XR rig ve el/kafa senkronizasyonu");
 
-        GameObject rig = GameObject.Find(RigName);
+        // GameObject.Find yalnizca AKTIF nesneleri bulur. Rig artik avatar SABLONU
+        // oldugu icin bilerek pasif duruyor; pasifleri de tarayan arama sart.
+        GameObject rig = MultiplayerProjectSetup.FindRig();
         if (rig == null)
         {
             Fail($"'{RigName}' sahnede yok - gozlukte hicbir sey gorunmez.");
@@ -260,6 +262,19 @@ public static class Faz2Checklist
         }
 
         Pass("XR rig sahnede.");
+
+        // Sablon AKTIF kalirsa kendi UID'siyle kaydolur; Alteruna onu klonlayinca
+        // ayni GUID iki nesnede olur, orijinal rig senkron gonderemez hale gelir ve
+        // sahnede iki AudioListener kalir. Alteruna'nin ornek sahnesinde de pasiftir.
+        Require(!rig.activeSelf,
+            "XR rig avatar SABLONU olarak pasif (dogru hal - oyuncu rig'ini Alteruna spawn eder).",
+            "XR rig AKTIF. Avatar sablonu pasif olmali, yoksa Alteruna klonlayinca UID cakisir " +
+            "('Synchronizable already registered') ve iki AudioListener olusur. " +
+            "Tools > Gece Vardiyasi > Multiplayer Kurulumunu Uygula komutunu calistir.");
+
+        Require(Object.FindFirstObjectByType<OfflineRigFallback>() != null,
+            "OfflineRigFallback var (oda yoksa rig cevrimdisi acilir).",
+            "OfflineRigFallback yok - odaya girilemezse sahnede oyuncu rig'i olmaz, ekran bos kalir.");
         Require(rig.GetComponent<AlterunaComponents.Avatar>() != null,
             "Rig'de Alteruna Avatar var.", "Rig'de Alteruna Avatar YOK.");
         Require(rig.GetComponent<Alteruna.XRIAvatar>() != null,
