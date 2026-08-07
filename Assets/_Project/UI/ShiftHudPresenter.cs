@@ -148,6 +148,7 @@ public class ShiftHudPresenter : MonoBehaviour
             $"Yanlış: {report.incorrectCount}\n" +
             $"Ortalama karar süresi: {report.averageInspectMs:0} ms\n" +
             $"En çok karıştırılan: {confusedCategory}";
+        reportText.text += $"\nToplam sallama: {report.totalShakeCount}";
     }
 
     private void UpdateScore()
