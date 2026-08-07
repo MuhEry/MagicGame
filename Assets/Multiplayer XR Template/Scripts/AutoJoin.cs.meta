@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: b78b6c6b70c0a8f4c9b48bde21200a0e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/AutoJoin.cs
+  uploadId: 907446

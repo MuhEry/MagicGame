@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3f9336a53d1d2ea43895699cc52cb411
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Materials/Grid.mat
+  uploadId: 907446

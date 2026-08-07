@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 04f087bc77177c649a72e6b6f4c5a90d
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/DemoAssets/Prefabs/Interactables/Interaction
+    Affordance.prefab
+  uploadId: 907446

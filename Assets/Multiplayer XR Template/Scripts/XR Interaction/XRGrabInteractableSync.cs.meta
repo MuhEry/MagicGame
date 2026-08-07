@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 15d685e874094262b534d83bd555a36f
+timeCreated: 1699878437
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Interaction/XRGrabInteractableSync.cs
+  uploadId: 907446

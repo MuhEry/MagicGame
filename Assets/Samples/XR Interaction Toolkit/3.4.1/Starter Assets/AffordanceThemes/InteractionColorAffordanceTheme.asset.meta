@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 62c4c431963e57846ba061094eea1789
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/AffordanceThemes/InteractionColorAffordanceTheme.asset
+  uploadId: 907446

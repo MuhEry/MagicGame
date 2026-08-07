@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 685c93d3784a4a6f98d5682db42ffabf
+timeCreated: 1700131169
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Basic/SimpleXRMovement.cs
+  uploadId: 907446

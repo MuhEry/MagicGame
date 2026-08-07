@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3d2e36aacd7dc084b96e0755f1af4137
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Materials/Controller.mat
+  uploadId: 907446

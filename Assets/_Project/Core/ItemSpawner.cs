@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Alteruna.Multiplayer.Unity;
 using UnityEngine;
 
 [Serializable]
@@ -26,6 +27,7 @@ public class ItemSpawner : MonoBehaviour
 
     [Header("Sahne")]
     [SerializeField] private Transform spawnPoint;
+    [SerializeField] private Spawner networkSpawner;
 
     [Header("Varyasyon")]
     [Tooltip("Ayni gorunur prefab her dogusta Sesli, Parlak veya Agir olabilir. Gorunus kategori ipucu vermez.")]
@@ -122,8 +124,28 @@ public class ItemSpawner : MonoBehaviour
         ItemSpawnEntry entry = spawnQueue[nextQueueIndex++];
         Transform point = spawnPoint != null ? spawnPoint : transform;
 
-        // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
-        CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+        NetworkShiftCoordinator network = NetworkShiftCoordinator.Instance;
+        bool networkedRoom = network != null && network.IsInRoom;
+        if (networkedRoom && !network.IsHost)
+            return null;
+
+        if (networkedRoom && networkSpawner != null)
+        {
+            int prefabIndex = itemPrefabs.IndexOf(entry);
+            CurrentSpawnedItem = networkSpawner.Spawn(prefabIndex, point.position, point.rotation);
+        }
+        else
+        {
+            // Projedeki yerel Instantiate çağrısı yalnızca offline oyun için burada tutulur.
+            CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+        }
+
+        if (CurrentSpawnedItem == null)
+        {
+            Debug.LogError("ItemSpawner: Eşya üretilemedi.", this);
+            return null;
+        }
+
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
         if (randomizeCategoryPerSpawn)
@@ -158,6 +180,22 @@ public class ItemSpawner : MonoBehaviour
 
     void ApplyRuntimeCategory(GameObject item, int itemId)
     {
+        ItemCategory category = (ItemCategory)random.Next(0, 3);
+        float colorHue = (float)random.NextDouble();
+
+        NetworkShiftCoordinator network = NetworkShiftCoordinator.Instance;
+        NetworkItemState networkState = item.GetComponentInChildren<NetworkItemState>();
+        if (network != null && network.IsInRoom && networkState != null)
+        {
+            networkState.Publish(itemId, category, colorHue);
+            return;
+        }
+
+        ApplySpawnedItemState(item, itemId, category, colorHue);
+    }
+
+    public void ApplySpawnedItemState(GameObject item, int itemId, ItemCategory category, float colorHue)
+    {
         var identity = item.GetComponentInChildren<ItemIdentity>();
         if (identity == null || identity.ItemData == null)
             return;
@@ -166,7 +204,7 @@ public class ItemSpawner : MonoBehaviour
         // kategorisini degistirir; bu kopya yalnizca dogan nesneye aittir.
         ItemData runtimeData = Instantiate(identity.ItemData);
         runtimeData.id = itemId;
-        runtimeData.category = (ItemCategory)random.Next(0, 3);
+        runtimeData.category = category;
 
         switch (runtimeData.category)
         {
@@ -180,7 +218,7 @@ public class ItemSpawner : MonoBehaviour
             case ItemCategory.Parlak:
                 runtimeData.mass = 1f;
                 runtimeData.rattleClip = null;
-                runtimeData.glowColor = GetGlowColor();
+                runtimeData.glowColor = GetGlowColor(colorHue);
                 break;
 
             case ItemCategory.Agir:
@@ -196,7 +234,7 @@ public class ItemSpawner : MonoBehaviour
         if (body != null)
             body.mass = runtimeData.mass;
 
-        ApplyNonCategoryColor(item);
+        ApplyNonCategoryColor(item, colorHue);
     }
 
     AudioClip FindFallbackRattleClip()
@@ -214,14 +252,14 @@ public class ItemSpawner : MonoBehaviour
         return null;
     }
 
-    Color GetGlowColor()
+    static Color GetGlowColor(float hue)
     {
         // HDR renk, URP emissive materyalde gozle gorulur bir parlama verir.
-        Color baseColor = Color.HSVToRGB((float)random.NextDouble(), 0.65f, 1f);
+        Color baseColor = Color.HSVToRGB(Mathf.Repeat(hue, 1f), 0.65f, 1f);
         return baseColor * 4f;
     }
 
-    void ApplyNonCategoryColor(GameObject item)
+    static void ApplyNonCategoryColor(GameObject item, float hue)
     {
         var renderer = item.GetComponentInChildren<Renderer>();
         if (renderer == null)
@@ -229,7 +267,7 @@ public class ItemSpawner : MonoBehaviour
 
         var block = new MaterialPropertyBlock();
         renderer.GetPropertyBlock(block);
-        block.SetColor("_BaseColor", Color.HSVToRGB((float)random.NextDouble(), 0.25f, 0.8f));
+        block.SetColor("_BaseColor", Color.HSVToRGB(Mathf.Repeat(hue, 1f), 0.25f, 0.8f));
         renderer.SetPropertyBlock(block);
     }
 }

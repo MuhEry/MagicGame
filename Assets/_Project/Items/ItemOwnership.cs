@@ -1,3 +1,4 @@
+using Alteruna.Multiplayer.Unity;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -6,10 +7,12 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 public class ItemOwnership : MonoBehaviour
 {
     private XRGrabInteractable grabInteractable;
+    private RigidbodySynchronizable synchronizedBody;
 
     private void Awake()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
+        synchronizedBody = GetComponent<RigidbodySynchronizable>();
     }
 
     private void OnEnable()
@@ -32,11 +35,24 @@ public class ItemOwnership : MonoBehaviour
 
     private void OnSelectEntered(SelectEnterEventArgs args)
     {
-        // Stub: Will handle network ownership in Phase 2
+        if (synchronizedBody == null)
+            return;
+
+        // Alteruna RigidbodySynchronizable uses the sender of the next soft update as
+        // the current physics owner. A grab therefore takes authority without freezing
+        // the other client or maintaining a second custom ownership system.
+        synchronizedBody.AllowCollisionToAssumeOwner = true;
+        synchronizedBody.SendData = true;
+        synchronizedBody.SyncSettings();
+        synchronizedBody.ForceUpdate();
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
-        // Stub: Will handle network ownership in Phase 2
+        if (synchronizedBody == null)
+            return;
+
+        synchronizedBody.SyncSettings();
+        synchronizedBody.ForceUpdate();
     }
 }

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 620d68acf93c1264a9f130e2a3075ee9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/DemoAssets/Prefabs/Interactables/Interactable
+    Instant Pyramid.prefab
+  uploadId: 907446

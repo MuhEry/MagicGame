@@ -42,6 +42,13 @@
 # Visual Studio cache directory
 .vs/
 
+# JetBrains and OS-local workspace files
+.idea/
+.fleet/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
 # Gradle cache directory
 .gradle/
 
@@ -80,6 +87,15 @@ mono_crash.*
 *.unitypackage
 *.unitypackage.meta
 *.app
+
+
+# Signing credentials must stay local to each developer/build machine
+*.keystore
+*.jks
+
+# Unity build reports and local Android export output
+/BuildReports/
+/AndroidExport/
 
 # Crashlytics generated file
 crashlytics-build.properties

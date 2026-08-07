@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: a5952238ccd887e46964b8e53ac9b692
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/SetEnableStatusOnPossession.cs
+  uploadId: 907446

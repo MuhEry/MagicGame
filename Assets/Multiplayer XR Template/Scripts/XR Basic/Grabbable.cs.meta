@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 03169460f0cf4774955801dc82254cde
+timeCreated: 1699359755
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Basic/Grabbable.cs
+  uploadId: 907446

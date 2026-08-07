@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 8c07ad05f039772478e375e366d789ef
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2655988077585873504
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Presets/XRI
+    Default Right ActionBasedControllerManager.preset
+  uploadId: 907446
