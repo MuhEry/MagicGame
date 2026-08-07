@@ -18,7 +18,10 @@ public class ItemSpawnEntry
 public class ItemSpawner : MonoBehaviour
 {
     [Header("Sıra")]
-    [SerializeField] private int seed = 12345;
+    [Tooltip("0 = her vardiyada farklı sıra üretilir.\n" +
+             "0'dan farklıysa sıra HER ZAMAN aynıdır (hata ayıklama / tekrar üretilebilir test).\n" +
+             "Faz 2'de host, SetSeed ile istemciye aynı değeri geçirir.")]
+    [SerializeField] private int seed;
     [SerializeField] private List<ItemSpawnEntry> itemPrefabs = new List<ItemSpawnEntry>();
 
     [Header("Sahne")]
@@ -28,9 +31,26 @@ public class ItemSpawner : MonoBehaviour
     private System.Random random;
     private int nextQueueIndex;
 
+    /// <summary>
+    /// Bacadan bir esya dustugu anda tetiklenir. Ses/isik gibi sunum efektleri
+    /// bu event'e baglanir - kimse Update icinde spawner'i yoklamaz (mimari kural 7).
+    /// </summary>
+    public event Action<GameObject> ItemSpawned;
+
     public bool IsSpawning { get; private set; }
     public GameObject CurrentSpawnedItem { get; private set; }
-    public int Seed => seed;
+
+    /// <summary>Bu vardiyada FIILEN kullanilan seed. Faz 2'de host bunu istemciye gonderir.</summary>
+    public int Seed { get; private set; }
+
+    /// <summary>
+    /// Vardiya BASLAMADAN once cagrilir. Faz 2'de host, istemcilerin ayni sirayi
+    /// uretmesi icin kendi seed'ini bu metotla dagitir (mimari kural 4).
+    /// </summary>
+    public void SetSeed(int value)
+    {
+        seed = value;
+    }
 
     private void OnValidate()
     {
@@ -43,7 +63,13 @@ public class ItemSpawner : MonoBehaviour
     /// </summary>
     public void BeginShift()
     {
-        random = new System.Random(seed);
+        // seed 0 ise her vardiya farkli bir sira. UnityEngine.Random KULLANILMAZ
+        // (mimari kural 4) - tohum Environment.TickCount'tan alinir, uretim yine
+        // System.Random ile deterministiktir. Loglanan seed ile ayni tur tekrar oynatilabilir.
+        Seed = seed != 0 ? seed : System.Environment.TickCount;
+        random = new System.Random(Seed);
+        Debug.Log($"[ItemSpawner] Vardiya seed = {Seed} (Inspector'da 0 = her tur farkli)", this);
+
         spawnQueue.Clear();
 
         foreach (ItemSpawnEntry entry in itemPrefabs)
@@ -85,6 +111,9 @@ public class ItemSpawner : MonoBehaviour
         // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
         CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
+
+        ItemSpawned?.Invoke(CurrentSpawnedItem);
+
         return CurrentSpawnedItem;
     }
 
