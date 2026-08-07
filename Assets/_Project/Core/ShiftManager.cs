@@ -17,6 +17,7 @@ public struct ShiftReport
     public int correctCount;
     public int incorrectCount;
     public int inspectedItemCount;
+    public int totalShakeCount;
     public float averageInspectMs;
     public bool hasMostConfusedCategory;
     public ItemCategory mostConfusedCategory;
@@ -46,6 +47,7 @@ public class ShiftManager : MonoBehaviour
     private int correctCount;
     private int incorrectCount;
     private int inspectedItemCount;
+    private int totalShakeCount;
     private int currentSessionId;
     private int lastPublishedWholeSecond = -1;
 
@@ -55,6 +57,7 @@ public class ShiftManager : MonoBehaviour
     public int CorrectCount => correctCount;
     public int IncorrectCount => incorrectCount;
     public int InspectedItemCount => inspectedItemCount;
+    public int TotalShakeCount => totalShakeCount;
     public int Score => correctCount;
     public ShiftReport LastReport { get; private set; }
 
@@ -103,6 +106,7 @@ public class ShiftManager : MonoBehaviour
         correctCount = 0;
         incorrectCount = 0;
         inspectedItemCount = 0;
+        totalShakeCount = 0;
         totalInspectMs = 0f;
         incorrectByCategory.Clear();
         LastReport = default;
@@ -158,6 +162,7 @@ public class ShiftManager : MonoBehaviour
 
         inspectedItemCount++;
         totalInspectMs += safeInspectMs;
+        totalShakeCount += result.shakeCount;
 
         if (isCorrect)
         {
@@ -279,6 +284,7 @@ public class ShiftManager : MonoBehaviour
             correctCount = correctCount,
             incorrectCount = incorrectCount,
             inspectedItemCount = inspectedItemCount,
+            totalShakeCount = totalShakeCount,
             averageInspectMs = inspectedItemCount == 0
                 ? 0f
                 : totalInspectMs / inspectedItemCount
