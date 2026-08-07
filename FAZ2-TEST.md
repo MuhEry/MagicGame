@@ -163,6 +163,25 @@ basarisiz olur — yanlis alarmdir.
 - Kalici cozum: `Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Plugins/AlterunaDependencyCheck.dll`
   dosyasini `.meta`'siyla birlikte sil. Projede baska hicbir referansi yok.
 
+## Play'e basinca editor OLUYORSA / DONUYORSA
+
+**Once bunu calistir:** `Tools > Gece Vardiyası > Editörde XR Başlatmayı Kapat (Play çökmesi)`
+
+Editorde Play, **Standalone** XR ayarlarini kullanir ve orada "Initialize XR on Startup"
+acikti; her Play denemesi gozluk baglantisini ayaga kaldirmaya calisiyor ve editor
+oluyordu. Komut bu bayragi yalnizca Standalone'da kapatir.
+**ANDROID AYARI DEGISMEZ - APK'da VR aynen calisir.** Geri almak icin
+`Editörde XR Başlatmayı Aç (geri al)`.
+
+> **Aktif XR yapilandirmasi nerede?** Projenin kendi `Assets/XR/` klasoru DEGIL,
+> `Assets/Multiplayer XR Template/XR/XRGeneralSettings.asset`. Iki paralel agac var;
+> yanlisini duzenlemek saat kaybettirir. (`EditorBuildSettings > m_configObjects >
+> com.unity.xr.management.loader_settings`)
+>
+> **Dikkat:** Bu aktif yapilandirmada **Android hedefi Oculus Loader kullaniyor,
+> OpenXR degil.** Rig ve actigimiz ozelliklerin hepsi OpenXR'a gore. Cihaz testinden
+> once bu tutarsizlik netlestirilmeli.
+
 ## Editorde Play'e basinca Unity DONUYORSA
 
 **Editorde Quest Link ile test etmeyin.** Gozluk Link ile bagliyken Play'e basildiginda
