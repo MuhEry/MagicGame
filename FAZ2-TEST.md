@@ -16,8 +16,22 @@ Unity'yi ac, `Assets/_Project/Scenes/Main.unity` sahnesini ac ve sirayla:
 |---|---|---|
 | 1 | `Tools > Gece Vardiyası > Multiplayer Kurulumunu Uygula` | MultiplayerManager, AutoJoin, XR rig avatar bilesenleri, Alteruna Spawner, esya prefabi senkronizasyonu |
 | 2 | `Tools > Gece Vardiyası > Oyuncu Konumları ve HUD Kurulumunu Uygula` | Iki oyuncu baslangic noktasi, HUD_Player1 / HUD_Player2, ag teshis satiri |
-| 3 | `Tools > Gece Vardiyası > Build Settings'i Onar (yalnızca Main)` | Build listesinden sizmis ornek sahneleri temizler |
-| 4 | `Tools > Gece Vardiyası > Faz 2 Kontrol Listesini Doğrula` | Asagidaki her maddeyi tek tek dogrular |
+| 3 | `Tools > Gece Vardiyası > VR Girdisini Onar (OpenXR + Input Actions)` | **Kontrolcu girdisini ayaga kaldirir** — asagiya bak |
+| 4 | `Tools > Gece Vardiyası > Build Settings'i Onar (yalnızca Main)` | Build listesinden sizmis ornek sahneleri temizler |
+| 5 | `Tools > Gece Vardiyası > Faz 2 Kontrol Listesini Doğrula` | Asagidaki her maddeyi tek tek dogrular |
+
+### 3. adim neden kritik
+
+"Gozlukte hicbir sey algilanmiyor" belirtisinin IKI ayri sebebi vardi ve ikisi de
+yalnizca **uyari** uretiyordu, hata degil — bu yuzden Console'da fark edilmeden geciliyordu:
+
+1. **OpenXR'da tek ozellik acikti** ("Meta Quest Support"). Hicbir interaction profile
+   acik olmayinca OpenXR kontrolcu girdilerini hicbir action'a baglamaz. `Hand Tracking
+   Subsystem` de kapali oldugu icin Hands rig'i el izlemesine abone olamiyordu.
+2. **Sahnede `InputActionManager` yoktu.** O bilesen olmadan XRI'in Input Action Asset'i
+   hic etkinlestirilmez: kontrolcu pozisyonu guncellenmez, kavrama tetiklenmez.
+
+Komut ikisini de onarir ve neyi degistirdigini yazar.
 
 > **Durum:** Bu adimlar 7 Agustos 2026'da bu makinede calistirildi; kontrol listesi
 > **"Tum zorunlu maddeler tamam (0 uyari)"** dondu. Unity Console 0 hata / 0 uyari.
@@ -148,6 +162,34 @@ basarisiz olur — yanlis alarmdir.
   her Alteruna tipi iki kez tanimlanir (`CS0101`) ve proje hic derlenmez.
 - Kalici cozum: `Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Plugins/AlterunaDependencyCheck.dll`
   dosyasini `.meta`'siyla birlikte sil. Projede baska hicbir referansi yok.
+
+## Acik sorun: avatar kopyalanmasi (henuz duzeltilmedi)
+
+Editorde Play'e basildiginda log'da sunlar cikiyor:
+
+```
+Warning: Synchronizable already registered. XR Origin Hands (XR Rig)(Clone) -> TransformSynchronizable<a5973d4a-...>
+Warning: Synchronizable already registered. Main Camera -> TransformSynchronizable<f961ecc6-...>
+...
+Warning: Synchronizable not registered. XR Origin Hands (XR Rig) -> TransformSynchronizable<a5973d4a-...>
+There are 2 audio listeners in the scene.
+```
+
+**Sebep:** `MultiplayerManager.AvatarPrefab`, sahnedeki **canli** XR rig'ini gosteriyor.
+Alteruna odaya girerken onu klonluyor; klon, orijinalle **ayni** `CommunicationBridgeUID`
+GUID'lerini tasiyor. Klonun kaydi orijinalinkini disari itiyor, sonra orijinal rig
+"not registered" diyerek senkron gonderemez hale geliyor. Ayrica sahnede iki kamera
+ve iki AudioListener olusuyor.
+
+**Iki secenek** (ikisi de cihazda test edilmeli, bu yuzden simdilik dokunulmadi):
+
+| Secenek | Nasil | Riski |
+|---|---|---|
+| A. Avatar sablonunu ayirmak | Rig'in bir **prefab varligi** kopyasini cikar, `AvatarPrefab` onu gostersin. Sahnedeki rig yerel oyuncu olarak kalir | Yerel rig Alteruna'nin avatar sistemine dahil olmaz; diger oyuncu seni gorur mu, test gerekir |
+| B. Alteruna'nin desenine tam uymak | Sahnedeki rig'i **avatar sablonu** yap ve Alteruna herkes icin (senin icin de) spawn etsin | Oda yokken sahnede rig olmaz -> **cevrimdisi oyun bozulur** |
+
+Alteruna'nin kendi ornek sahnesi (`Assets/Multiplayer XR Template/Scenes/XR Interaction.unity`)
+B desenini kullaniyor. Karar ekipte; secildikten sonra kontrol listesine de bir madde eklenmeli.
 
 ## Bilinen sinirlar
 

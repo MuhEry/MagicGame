@@ -6,7 +6,9 @@ using Alteruna.Multiplayer.Unity;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.XR.Interaction.Toolkit.Inputs;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.OpenXR;
 
 /// <summary>
 /// Sartnamedeki "Faz 2 kontrol listesi" ve "Asagidakilerin hepsi saglanmadan gun
@@ -42,6 +44,7 @@ public static class Faz2Checklist
         }
 
         CheckPackages();
+        CheckXrInput();
         CheckMultiplayerManager();
         CheckRig();
         CheckSystems();
@@ -135,6 +138,66 @@ public static class Faz2Checklist
         bool template = AssetDatabase.IsValidFolder("Assets/Multiplayer XR Template");
         Require(template, "Multiplayer XR Template kurulu.",
             "Multiplayer XR Template klasoru yok - avatar/rig referansi eksik.");
+    }
+
+    // --------------------------------------------------------------- VR girdisi
+
+    /// <summary>
+    /// Gozlukte "hicbir sey algilanmiyor" belirtisinin iki sessiz sebebi. Ikisi de
+    /// yalnizca UYARI uretir, hata uretmez; Console'da fark edilmeden geciliyordu.
+    /// </summary>
+    static void CheckXrInput()
+    {
+        s_Lines.Add("1b) VR girdisi (OpenXR + Input Actions)");
+
+        OpenXRSettings openXr = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
+        if (openXr == null)
+        {
+            Fail("OpenXR Android ayarlari yok. XR Plug-in Management'ta OpenXR'i etkinlestir.");
+        }
+        else
+        {
+            string[] required = { "Oculus Touch Controller Profile", "Hand Tracking Subsystem" };
+            List<string> missing = new List<string>();
+
+            foreach (string wanted in required)
+            {
+                bool on = openXr.GetFeatures().Any(feature =>
+                {
+                    if (feature == null || !feature.enabled)
+                        return false;
+                    SerializedProperty nameUi = new SerializedObject(feature).FindProperty("nameUi");
+                    return nameUi != null &&
+                           string.Equals(nameUi.stringValue, wanted, System.StringComparison.OrdinalIgnoreCase);
+                });
+
+                if (!on)
+                    missing.Add(wanted);
+            }
+
+            Require(missing.Count == 0,
+                "OpenXR: kontrolcu profili ve el izleme acik.",
+                "OpenXR'da kapali: " + string.Join(", ", missing) +
+                ". Interaction profile yoksa OpenXR HICBIR kontrolcu girdisini baglamaz. " +
+                "Tools > Gece Vardiyasi > VR Girdisini Onar komutunu calistir.");
+        }
+
+        InputActionManager actionManager = Object.FindFirstObjectByType<InputActionManager>();
+        if (actionManager == null)
+        {
+            Fail("Sahnede InputActionManager yok - XRI'in input action'lari HIC etkinlestirilmez, " +
+                 "kontrolcu pozisyonu gelmez ve kavrama tetiklenmez. " +
+                 "Tools > Gece Vardiyasi > VR Girdisini Onar komutunu calistir.");
+        }
+        else
+        {
+            SerializedProperty assets = new SerializedObject(actionManager).FindProperty("m_ActionAssets");
+            bool hasAsset = assets != null && assets.arraySize > 0 &&
+                            assets.GetArrayElementAtIndex(0).objectReferenceValue != null;
+            Require(hasAsset,
+                "InputActionManager sahnede ve bir Input Action Asset bagli.",
+                "InputActionManager var ama Input Action Asset atanmamis - action'lar yine etkinlesmez.");
+        }
     }
 
     // ------------------------------------------------------------ oda / avatar
