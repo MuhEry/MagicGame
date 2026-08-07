@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c46926cda14757f46af3c3ee17a2ea7a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/Editor/Scripts/MapInfoDrawer.cs
+  uploadId: 967388

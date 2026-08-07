@@ -56,6 +56,10 @@ public class CategorySocket : XRSocketInteractor
     [SerializeField]
     FeedbackController m_Feedback;
 
+    [Tooltip("Bos birakilirsa ust dolapta aranir. Dogru esya yerlesince aktif soketi siradaki rafa tasir.")]
+    [SerializeField]
+    CabinetShelfRack m_ShelfRack;
+
     /// <summary>Bu dolabin kabul ettigi kategori.</summary>
     public ItemCategory acceptedCategory
     {
@@ -89,6 +93,9 @@ public class CategorySocket : XRSocketInteractor
 
         if (m_Feedback == null)
             m_Feedback = GetComponentInParent<FeedbackController>();
+
+        if (m_ShelfRack == null)
+            m_ShelfRack = GetComponentInParent<CabinetShelfRack>();
     }
 
     /// <inheritdoc />
@@ -110,6 +117,11 @@ public class CategorySocket : XRSocketInteractor
         // DIKKAT: Burada BILEREK kategori filtresi YOK.
         // "Sadece dogruyu al" seklinde kisitlamak sartnamenin acikca yasakladigi seydir.
         if (!base.CanSelect(interactable))
+            return false;
+
+        // Dolu dolap yeni esya almaz. Bu kontrol kategori filtresi degildir;
+        // kapasite korumasidir ve yanlis/ dogru karar davranisini degistirmez.
+        if (m_ShelfRack != null && !m_ShelfRack.HasSpace)
             return false;
 
         // Bir esyayi disari atarken, o esyayi birakana kadar BASKA esya kabul etme.
@@ -293,22 +305,26 @@ public class CategorySocket : XRSocketInteractor
         if (m_AcceptDelay > 0f)
             yield return new WaitForSeconds(m_AcceptDelay);
 
-        // ONEMLI SIRA: esyayi ONCE etkilesim disina al, SONRA birak.
-        // Devre disi birakilan bir interactable XRI'dan otomatik olarak cikar ve
-        // secim iptal edilir. Boylece "birakma" ile "yok etme" arasindaki karede
-        // soket ayni esyayi TEKRAR yakalayamaz.
-        if (itemTransform != null)
-            itemTransform.gameObject.SetActive(false);
-
+        // Secimi kontrollu bitir. m_Accepting kilidi bu karede ayni esyanin
+        // yeniden sokete alinmasini engeller; esyayi devre disi birakmiyoruz
+        // cunku dogru nesne artik rafin icinde gorunur kalacak.
         if (interactionManager != null && interactable != null && IsSelecting(interactable))
             interactionManager.SelectExit(this, interactable);
 
         yield return null;
 
-        // TODO(Faz 2): Agda Destroy dogrudan kullanilamaz; nesne yasam dongusu
-        //              ItemSpawner uzerinden despawn edilmeli (mimari kural 3).
-        if (itemTransform != null)
+        // Dogru esya rafin icinde kalir. Raf yoneticisi soketi ancak burada,
+        // yani kesin olarak dogru karar verildikten sonra siradaki goze tasir.
+        // Bu sira yanlis denemelerin soket konumunu bozmasini engeller.
+        if (m_ShelfRack != null && m_ShelfRack.Store(interactable))
+        {
+            // Store() esyayi rafta kinematic/dekor haline getirir.
+        }
+        else if (itemTransform != null)
+        {
+            // Eski prefablar raf yoneticisi olmadan da calismaya devam eder.
             Destroy(itemTransform.gameObject);
+        }
 
         m_Accepting = false;
         m_AcceptRoutine = null;

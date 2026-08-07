@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5a577542a281e0a448dc3b383023e1f2
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/Prefabs/Room Menu.prefab
+  uploadId: 967388

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2402358a24b89de43a99abcf4cc8050c
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/Scripts/AlterunaComponents/readme.txt
+  uploadId: 967388

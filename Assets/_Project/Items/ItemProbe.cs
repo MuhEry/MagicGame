@@ -11,6 +11,7 @@ public class ItemProbe : MonoBehaviour
     [SerializeField] private float shakeThreshold = 0.05f;
     [SerializeField] private float shakeCooldown = 0.5f;
     [SerializeField] private float hapticMassMultiplier = 0.1f;
+    [SerializeField] private float glowDistance = 0.5f;
 
     private XRGrabInteractable grabInteractable;
     private ItemIdentity itemIdentity;
@@ -43,7 +44,8 @@ public class ItemProbe : MonoBehaviour
         }
         propBlock = new MaterialPropertyBlock();
 
-        // Ensure emission keyword is active on the shared material to support dynamic emission
+        // URP/Lit'te sadece PropertyBlock yazmak yetmez: emission keyword'u kapaliysa
+        // renk hesaplanmaz. Her prefabdaki paylasilan materyalde bunu garanti ederiz.
         if (itemRenderer != null && itemRenderer.sharedMaterial != null)
         {
             itemRenderer.sharedMaterial.EnableKeyword("_EMISSION");
@@ -91,17 +93,14 @@ public class ItemProbe : MonoBehaviour
         if (data.category == ItemCategory.Parlak)
         {
             bool shouldGlow = false;
-            if (isSelected)
+            // Referanstaki kural "eldeyken" degil, esya kameraya yakindayken
+            // parlamasidir. Bu nedenle oyuncu masadaki esyaya yaklasinca da sinyal
+            // gorunur; kamera/elde tutma bagimliligi parlamayi sessizce kapatmaz.
+            Camera mainCam = PlayerRefs.Instance != null ? PlayerRefs.Instance.MainCamera : Camera.main;
+            if (mainCam != null)
             {
-                Camera mainCam = PlayerRefs.Instance != null ? PlayerRefs.Instance.MainCamera : Camera.main;
-                if (mainCam != null)
-                {
-                    float dist = Vector3.Distance(transform.position, mainCam.transform.position);
-                    if (dist < 0.35f)
-                    {
-                        shouldGlow = true;
-                    }
-                }
+                float dist = Vector3.Distance(transform.position, mainCam.transform.position);
+                shouldGlow = dist < glowDistance;
             }
 
             Color targetColor = shouldGlow ? data.glowColor : Color.black;

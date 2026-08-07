@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: baf7984d079cf8646a691c6cc4634702
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/Scripts/RoomBrowser/BaseRoomBrowser.cs
+  uploadId: 967388

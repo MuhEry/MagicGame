@@ -64,6 +64,21 @@ static class CabinetSandboxBuilder
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             return;
 
+        BuildAllInternal();
+    }
+
+    /// <summary>
+    /// CI/batch mode giris noktasi. Diyalog gostermeden prefab ve sandbox'i yeniler.
+    /// Unity komut satirinda -executeMethod ile cagrilabilir.
+    /// </summary>
+    public static void RebuildFromCommandLine()
+    {
+        BuildAllInternal();
+    }
+
+    static void BuildAllInternal()
+    {
+
         EnsureFolder("Assets/_Project/Scenes");
         EnsureFolder(k_MaterialFolder);
         EnsureFolder(k_PrefabFolder);
@@ -168,25 +183,54 @@ static class CabinetSandboxBuilder
     {
         var root = new GameObject(name);
 
-        var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        body.name = "Govde";
-        body.transform.SetParent(root.transform, false);
-        body.transform.localPosition = new Vector3(0f, 0.5f, 0f);
-        body.transform.localScale = new Vector3(0.7f, 1.0f, 0.5f);
-        var bodyRenderer = body.GetComponent<Renderer>();
-        if (material != null)
-            bodyRenderer.sharedMaterial = material;
+        // Kapali mavi bir blok yerine on yuzeyi acik, uc rafli bir dolap kurulur.
+        // Eserler soldan saga dolar, her satir bitince alttaki rafa iner.
+        var back = CreateCabinetPart("Govde", root.transform,
+            new Vector3(0f, 0.52f, 0.18f), new Vector3(0.84f, 1.08f, 0.08f), material);
+        CreateCabinetPart("SolYan", root.transform,
+            new Vector3(-0.42f, 0.52f, -0.04f), new Vector3(0.07f, 1.08f, 0.52f), material);
+        CreateCabinetPart("SagYan", root.transform,
+            new Vector3(0.42f, 0.52f, -0.04f), new Vector3(0.07f, 1.08f, 0.52f), material);
+        CreateCabinetPart("Ust", root.transform,
+            new Vector3(0f, 1.04f, -0.04f), new Vector3(0.84f, 0.07f, 0.52f), material);
+        CreateCabinetPart("Alt", root.transform,
+            new Vector3(0f, 0.04f, -0.04f), new Vector3(0.84f, 0.07f, 0.52f), material);
+        CreateCabinetPart("Raf_1", root.transform,
+            new Vector3(0f, 0.70f, -0.04f), new Vector3(0.76f, 0.045f, 0.48f), material);
+        CreateCabinetPart("Raf_2", root.transform,
+            new Vector3(0f, 0.45f, -0.04f), new Vector3(0.76f, 0.045f, 0.48f), material);
+        CreateCabinetPart("Raf_3", root.transform,
+            new Vector3(0f, 0.20f, -0.04f), new Vector3(0.76f, 0.045f, 0.48f), material);
 
-        // Soket: dolabin on yuzunde, bel hizasinda (~1,0 m).
+        var storedItems = new GameObject("Rafa_Yerlesen_Esyalar");
+        storedItems.transform.SetParent(root.transform, false);
+
+        // Tek aktif soket, bos gozun onunde duran kucuk bir halka/gosterge olur.
+        // Dolayisiyla kullaniciya gorunen buyuk mavi hedef plakasi kalmaz.
         var socketGo = new GameObject("Socket");
         socketGo.transform.SetParent(root.transform, false);
-        socketGo.transform.localPosition = new Vector3(0f, 1.0f, -0.3f);
+        socketGo.transform.localPosition = new Vector3(-0.18f, 0.82f, -0.31f);
         // forward'i oyuncuya (-Z) dogru cevir: yanlis esya BU yone itilecek.
         socketGo.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
         var trigger = socketGo.AddComponent<SphereCollider>();
         trigger.isTrigger = true;
-        trigger.radius = 0.22f;
+        trigger.radius = 0.11f;
+
+        var socketVisual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        socketVisual.name = "AktifYuvaGostergesi";
+        socketVisual.transform.SetParent(socketGo.transform, false);
+        socketVisual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        socketVisual.transform.localScale = new Vector3(0.13f, 0.012f, 0.13f);
+        if (material != null)
+            socketVisual.GetComponent<Renderer>().sharedMaterial = material;
+        Object.DestroyImmediate(socketVisual.GetComponent<Collider>());
+
+        var rack = root.AddComponent<CabinetShelfRack>();
+        var rackSo = new SerializedObject(rack);
+        rackSo.FindProperty("m_SocketTransform").objectReferenceValue = socketGo.transform;
+        rackSo.FindProperty("m_StoredItemsRoot").objectReferenceValue = storedItems.transform;
+        rackSo.ApplyModifiedPropertiesWithoutUndo();
 
         var audio = root.AddComponent<AudioSource>();
         audio.playOnAwake = false;
@@ -195,7 +239,7 @@ static class CabinetSandboxBuilder
 
         var feedback = root.AddComponent<FeedbackController>();
         var feedbackSo = new SerializedObject(feedback);
-        feedbackSo.FindProperty("m_BodyRenderer").objectReferenceValue = bodyRenderer;
+        feedbackSo.FindProperty("m_BodyRenderer").objectReferenceValue = back.GetComponent<Renderer>();
         feedbackSo.FindProperty("m_AudioSource").objectReferenceValue = audio;
         feedbackSo.FindProperty("m_CorrectClip").objectReferenceValue = correctClip;
         feedbackSo.FindProperty("m_WrongClip").objectReferenceValue = wrongClip;
@@ -208,6 +252,19 @@ static class CabinetSandboxBuilder
         socketSo.ApplyModifiedPropertiesWithoutUndo();
 
         return root;
+    }
+
+    static GameObject CreateCabinetPart(string name, Transform parent, Vector3 localPosition,
+        Vector3 localScale, Material material)
+    {
+        var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        part.name = name;
+        part.transform.SetParent(parent, false);
+        part.transform.localPosition = localPosition;
+        part.transform.localScale = localScale;
+        if (material != null)
+            part.GetComponent<Renderer>().sharedMaterial = material;
+        return part;
     }
 
     static void EnsureFolder(string assetPath)
