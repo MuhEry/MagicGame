@@ -27,9 +27,17 @@ public class ItemSpawner : MonoBehaviour
     [Header("Sahne")]
     [SerializeField] private Transform spawnPoint;
 
+    [Header("Varyasyon")]
+    [Tooltip("Ayni gorunur prefab her dogusta Sesli, Parlak veya Agir olabilir. Gorunus kategori ipucu vermez.")]
+    [SerializeField] private bool randomizeCategoryPerSpawn = true;
+
+    [Tooltip("Sesli secilen prefabin kendi klibi yoksa kullanilir.")]
+    [SerializeField] private AudioClip fallbackRattleClip;
+
     private readonly List<ItemSpawnEntry> spawnQueue = new List<ItemSpawnEntry>();
     private System.Random random;
     private int nextQueueIndex;
+    private int lastSpawnedItemId = int.MinValue;
 
     /// <summary>
     /// Bacadan bir esya dustugu anda tetiklenir. Ses/isik gibi sunum efektleri
@@ -85,6 +93,7 @@ public class ItemSpawner : MonoBehaviour
         }
 
         nextQueueIndex = 0;
+        lastSpawnedItemId = int.MinValue;
         IsSpawning = true;
 
         if (spawnQueue.Count == 0)
@@ -99,6 +108,11 @@ public class ItemSpawner : MonoBehaviour
             return null;
         }
 
+        // 9 prefab ilk turla sinirli degil: vardiya bitene kadar kuyrugu
+        // ayni seedli random kaynakla yeniden karistirip devam ederiz.
+        if (spawnQueue.Count > 0 && nextQueueIndex >= spawnQueue.Count)
+            RefillQueue();
+
         if (nextQueueIndex >= spawnQueue.Count)
         {
             Debug.Log("ItemSpawner: Bu vardiya için tanımlı tüm eşyalar üretildi.", this);
@@ -112,6 +126,11 @@ public class ItemSpawner : MonoBehaviour
         CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
+        if (randomizeCategoryPerSpawn)
+            ApplyRuntimeCategory(CurrentSpawnedItem, entry.itemId);
+
+        lastSpawnedItemId = entry.itemId;
+
         ItemSpawned?.Invoke(CurrentSpawnedItem);
 
         return CurrentSpawnedItem;
@@ -120,5 +139,97 @@ public class ItemSpawner : MonoBehaviour
     public void StopSpawning()
     {
         IsSpawning = false;
+    }
+
+    void RefillQueue()
+    {
+        for (int index = spawnQueue.Count - 1; index > 0; index--)
+        {
+            int swapIndex = random.Next(index + 1);
+            (spawnQueue[index], spawnQueue[swapIndex]) = (spawnQueue[swapIndex], spawnQueue[index]);
+        }
+
+        // Kuyruk sinirinda ayni gorunen prefab iki kez arka arkaya gelmesin.
+        if (spawnQueue.Count > 1 && spawnQueue[0].itemId == lastSpawnedItemId)
+            (spawnQueue[0], spawnQueue[1]) = (spawnQueue[1], spawnQueue[0]);
+
+        nextQueueIndex = 0;
+    }
+
+    void ApplyRuntimeCategory(GameObject item, int itemId)
+    {
+        var identity = item.GetComponentInChildren<ItemIdentity>();
+        if (identity == null || identity.ItemData == null)
+            return;
+
+        // Kaynak ItemData bir assettir. Onu degistirmek tum prefablarin
+        // kategorisini degistirir; bu kopya yalnizca dogan nesneye aittir.
+        ItemData runtimeData = Instantiate(identity.ItemData);
+        runtimeData.id = itemId;
+        runtimeData.category = (ItemCategory)random.Next(0, 3);
+
+        switch (runtimeData.category)
+        {
+            case ItemCategory.Sesli:
+                runtimeData.mass = 1f;
+                if (runtimeData.rattleClip == null)
+                    runtimeData.rattleClip = FindFallbackRattleClip();
+                runtimeData.glowColor = Color.black;
+                break;
+
+            case ItemCategory.Parlak:
+                runtimeData.mass = 1f;
+                runtimeData.rattleClip = null;
+                runtimeData.glowColor = GetGlowColor();
+                break;
+
+            case ItemCategory.Agir:
+                runtimeData.mass = 8f;
+                runtimeData.rattleClip = null;
+                runtimeData.glowColor = Color.black;
+                break;
+        }
+
+        identity.SetRuntimeItemData(runtimeData);
+
+        var body = item.GetComponentInChildren<Rigidbody>();
+        if (body != null)
+            body.mass = runtimeData.mass;
+
+        ApplyNonCategoryColor(item);
+    }
+
+    AudioClip FindFallbackRattleClip()
+    {
+        if (fallbackRattleClip != null)
+            return fallbackRattleClip;
+
+        foreach (ItemSpawnEntry entry in itemPrefabs)
+        {
+            var identity = entry?.prefab != null ? entry.prefab.GetComponentInChildren<ItemIdentity>() : null;
+            if (identity != null && identity.ItemData != null && identity.ItemData.rattleClip != null)
+                return identity.ItemData.rattleClip;
+        }
+
+        return null;
+    }
+
+    Color GetGlowColor()
+    {
+        // HDR renk, URP emissive materyalde gozle gorulur bir parlama verir.
+        Color baseColor = Color.HSVToRGB((float)random.NextDouble(), 0.65f, 1f);
+        return baseColor * 4f;
+    }
+
+    void ApplyNonCategoryColor(GameObject item)
+    {
+        var renderer = item.GetComponentInChildren<Renderer>();
+        if (renderer == null)
+            return;
+
+        var block = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(block);
+        block.SetColor("_BaseColor", Color.HSVToRGB((float)random.NextDouble(), 0.25f, 0.8f));
+        renderer.SetPropertyBlock(block);
     }
 }

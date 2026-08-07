@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 253f27a4f890ce1479fe8aec17027902
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/Scripts/AlterunaComponents/VoiceSynchronizable/VoiceSyncMic.cs
+  uploadId: 967388

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: baa02c02e311f71499de2d2e51f9b2f1
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 217234
+  packageName: Alteruna Multiplayer Networking SDK
+  packageVersion: 2.1.0u0
+  assetPath: Assets/Alteruna/com.alteruna.multiplayer.asmdef
+  uploadId: 967388

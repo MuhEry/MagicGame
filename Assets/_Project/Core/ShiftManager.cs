@@ -175,7 +175,12 @@ public class ShiftManager : MonoBehaviour
         }
 
         OnDecision?.Invoke(result);
-        QueueNextItem();
+
+        // Yanlis esya soketten geri firlar ve oyuncu ayni esyayi tekrar dener.
+        // Yeni esya yalnizca dogru yerlestirme sonrasi uretilir; aksi halde
+        // ayni anda birden fazla esya dogar ve karar/raf sirasi bozulur.
+        if (isCorrect)
+            QueueNextItem();
     }
 
     /// <summary>
