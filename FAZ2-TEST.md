@@ -163,6 +163,38 @@ basarisiz olur — yanlis alarmdir.
 - Kalici cozum: `Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Plugins/AlterunaDependencyCheck.dll`
   dosyasini `.meta`'siyla birlikte sil. Projede baska hicbir referansi yok.
 
+## Editorde Play'e basinca Unity DONUYORSA
+
+**Editorde Quest Link ile test etmeyin.** Gozluk Link ile bagliyken Play'e basildiginda
+Unity'nin ana dongusu gozlugun kare temposuna kilitlenir (`xrWaitFrame`). Gozluk
+takili degilse, uykudaysa veya Link oturumu goruntu sunmuyorsa Unity beklemede kalir ve
+**editor tamamen donmus gorunur**. Cokme degildir; islemci de bosta durur.
+
+Donan oturumun `Editor-prev.log` dosyasindaki imzasi:
+
+```
+[XR] Available Layers: (0)
+XR: Error setting active audio output driver. Falling back to default.
+[Subsystems] Loading plugin UnityOpenXR for subsystem OpenXR Display...
+[Subsystems] Loading plugin UnityOpenXR for subsystem OpenXR Input...
+   <- burada susar, hicbir istisna veya hata YOKTUR
+```
+
+Hata mesaji ARAMAYIN, yok. Dogru yol: **Build & Run** ile APK'yi cihaza atmak.
+Sartname de zaten bunu istiyor ("kendi gozlugunde derleyip calistir").
+
+Editorde tek kisilik akisi denemek isterseniz: XR Plug-in Management'ta OpenXR'i
+gecici olarak kapatin; oyun masaustu penceresinde calisir, ag katmani aynen calisir.
+
+## "Gozlukte siyah ekran / hicbir sey yok" ise
+
+Sahnedeki rig avatar SABLONU oldugu icin PASIF durur (dogru hal). Alteruna spawn ettigi
+avatari acmazsa sahnede hic kamera kalmaz ve gozlukte siyah ekran gorunur.
+`OfflineRigFallback` (Rig Bekcisi) bunu yakalar: 5 sn boyunca aktif kamera yoksa once
+Alteruna'nin spawn ettigi avatari, o da yoksa sablon rig'i acar ve Console'a ne yaptigini
+yazar. Console'da `[Rig Bekcisi]` satirini ararsaniz hangi durumun gerceklestigini
+dogrudan gorursunuz.
+
 ## Editorde "VR algilanmiyor" ise: once gozlugu kontrol et
 
 Editor log'unda su varsa proje hatasi YOKTUR, bilgisayara gozluk bagli degildir:
