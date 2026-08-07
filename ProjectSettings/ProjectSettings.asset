@@ -170,8 +170,8 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Standalone: com.DefaultCompany.com.unity.template.vr
     Android: com.magicgameteam.gecevardiyasi
+    Standalone: com.DefaultCompany.com.unity.template.vr
   buildNumber:
     Standalone: 0
     VisionOS: 0
@@ -743,7 +743,7 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: USE_INPUT_SYSTEM_POSE_CONTROL
+    Android: USE_INPUT_SYSTEM_POSE_CONTROL;ALTERUNA;ALTERUNA_REGISTERED;ALTERUNA_V_2_X_X_X;ALTERUNA_V_2_1_X_X;ALTERUNA_V_2_1_0_X;ALTERUNA_V_2_1_0_0
     Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;ALTERUNA;ALTERUNA_V_2_X_X_X;ALTERUNA_V_2_1_X_X;ALTERUNA_V_2_1_0_X;ALTERUNA_V_2_1_0_0
     Windows Store Apps: USE_INPUT_SYSTEM_POSE_CONTROL
   additionalCompilerArguments: {}
