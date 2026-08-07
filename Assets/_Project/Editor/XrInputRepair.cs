@@ -54,7 +54,10 @@ public static class XrInputRepair
     public static void RepairFromMenu()
     {
         StringBuilder report = new StringBuilder();
-        report.AppendLine(RepairOpenXrFeatures());
+        // Standalone = editorde gozlukle test, Android = APK. Ikisi de gerekli.
+        report.AppendLine(RepairOpenXrFeatures(BuildTargetGroup.Standalone));
+        report.AppendLine();
+        report.AppendLine(RepairOpenXrFeatures(BuildTargetGroup.Android));
         report.AppendLine();
         report.AppendLine(EnsureInputActionManager(true));
 
@@ -66,11 +69,20 @@ public static class XrInputRepair
 
     public static string RepairOpenXrFeatures()
     {
-        OpenXRSettings settings = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
-        if (settings == null)
-            return "OpenXR: Android ayarlari bulunamadi. XR Plug-in Management'ta OpenXR acik mi?";
+        return RepairOpenXrFeatures(BuildTargetGroup.Android);
+    }
 
-        FeatureHelpers.RefreshFeatures(BuildTargetGroup.Android);
+    /// <summary>
+    /// Gozlukle EDITORDE test edebilmek icin Standalone hedefinde de ayni
+    /// ozelliklerin acik olmasi gerekir; APK icin Android hedefi kullanilir.
+    /// </summary>
+    public static string RepairOpenXrFeatures(BuildTargetGroup targetGroup)
+    {
+        OpenXRSettings settings = OpenXRSettings.GetSettingsForBuildTargetGroup(targetGroup);
+        if (settings == null)
+            return $"OpenXR ({targetGroup}): ayarlar bulunamadi. XR Plug-in Management'ta OpenXR acik mi?";
+
+        FeatureHelpers.RefreshFeatures(targetGroup);
 
         List<string> turnedOn = new List<string>();
         List<string> alreadyOn = new List<string>();
@@ -105,7 +117,7 @@ public static class XrInputRepair
         AssetDatabase.SaveAssets();
 
         StringBuilder result = new StringBuilder();
-        result.AppendLine("OpenXR (Android):");
+        result.AppendLine($"OpenXR ({targetGroup}):");
         result.AppendLine(turnedOn.Count > 0
             ? "  ACILDI: " + string.Join(", ", turnedOn)
             : "  Acilacak yeni ozellik yoktu.");

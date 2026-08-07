@@ -1,134 +1,120 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Play'e basildigi anda editorun olmesini onaran arac.
+/// Editorde gozlukle test edilebilmesi icin XR yapilandirmasini onarir.
 ///
-/// TESHIS (Editor-prev.log): log her seferinde tam olarak
-///   UnityEngine.XR.Management.XRGeneralSettings:AttemptInitializeXRSDKOnLoad ()
-///   [Subsystems] Loading plugin UnityOpenXR for subsystem OpenXR Display...
-///   [Subsystems] Loading plugin UnityOpenXR for subsystem OpenXR Input...
-/// satirlarindan sonra susuyordu. Hicbir istisna, hicbir C# hatasi yok; bizim
-/// scriptlerimiz tek satir log basmadan olay bitiyordu. Yani sorun oyun kodunda
-/// degil, Play'e girerken XR'in ayaga kaldirilmasinda.
+/// TESHIS
+/// Play'e basildigi anda editor oluyordu. Editor-prev.log her seferinde ayni yerde
+/// susuyordu: XRGeneralSettings:AttemptInitializeXRSDKOnLoad -> OpenXR Display ->
+/// OpenXR Input -> "Shut down.". Hicbir istisna, hicbir C# hatasi, crash dump yok.
 ///
-/// Bulunan iki somut bozukluk:
+/// SEBEP
+/// Projede IKI paralel XR ayar agaci var ve AKTIF olan, Multiplayer XR Template'ten
+/// gelen kopyaydi:
+///   EditorBuildSettings > m_configObjects > com.unity.xr.management.loader_settings
 ///
-/// 1) AKTIF OpenXR ayar varliginda SCRIPTI KAYIP bir ozellik girdisi var
-///    (guid 96efa89124dda0941802f28ad8249b87 - projede ve paketlerde hicbir yerde yok).
-///    Unity acilista "The referenced script (Unknown) on this Behaviour is missing!"
-///    uyarisini tam da XR init sirasinda basiyor. OpenXR yukleyicisi ozellik
-///    listesini gezerken bozuk girdiye denk geliyor.
+/// O kopyadaki "Open XR Package Settings.asset" icinde SCRIPTI KAYIP bir ozellik
+/// girdisi var (guid 96efa89124dda0941802f28ad8249b87 - projede ve hicbir pakette
+/// yok). OpenXR yukleyicisi ozellik listesini gezerken bu bozuk girdiye carpiyor.
 ///
-/// 2) Editorde Play, Standalone ayarlarini kullanir ve orada
-///    "Initialize XR on Startup" ACIK. Yani her Play denemesi gozluk baglantisini
-///    ayaga kaldirmaya calisiyor. Oysa bu projede test yolu Build & Run.
+/// Onemli ayrinti: scripti kayip bir MonoBehaviour NULL DEGILDIR - nesne olarak
+/// durur. Bu yuzden "null girdileri temizle" yaklasimi onu bulamaz.
 ///
-/// Bu arac ikisini de onarir. ANDROID ayarlarina DOKUNMAZ: APK'nin XR baslatmasi
-/// aynen korunur.
+/// COZUM
+/// Projenin KENDI temiz ayarlarina gecmek. Karsilastirma:
+///   Assets/XR/Settings/OpenXRPackageSettings.asset          101 MonoBehaviour, 0 kayip
+///   Multiplayer XR Template/.../Open XR Package Settings     103 MonoBehaviour, 1 kayip
+///
+/// Ustelik projenin kendi XRGeneralSettingsPerBuildTarget'inda Standalone ve Android
+/// hedeflerinin IKISI de OpenXR loader kullaniyor (template'inki Android'de Oculus
+/// Loader kullaniyordu - actigimiz tum OpenXR ozellikleriyle tutarsizdi).
 /// </summary>
 public static class XrStartupRepair
 {
     const string LoaderSettingsKey = "com.unity.xr.management.loader_settings";
     const string OpenXrSettingsKey = "com.unity.xr.openxr.settings4";
 
-    [MenuItem("Tools/Gece Vardiyası/Editörde XR Başlatmayı Kapat (Play çökmesi)", false, 43)]
+    const string CleanLoaderSettingsPath = "Assets/XR/XRGeneralSettingsPerBuildTarget.asset";
+    const string CleanOpenXrSettingsPath = "Assets/XR/Settings/OpenXRPackageSettings.asset";
+
+    [MenuItem("Tools/Gece Vardiyası/Editörde VR Testini Onar (XR yapılandırması)", false, 43)]
     public static void RepairFromMenu()
     {
         StringBuilder report = new StringBuilder();
-        report.AppendLine(RemoveBrokenOpenXrFeatures());
+
+        report.AppendLine(SwitchToCleanXrConfig());
         report.AppendLine();
-        report.AppendLine(SetStandaloneXrInitOnStart(false));
+        report.AppendLine(SetStandaloneXrInitOnStart(true));
+        report.AppendLine();
+        report.AppendLine(XrInputRepair.RepairOpenXrFeatures(BuildTargetGroup.Standalone));
+        report.AppendLine();
+        report.AppendLine(XrInputRepair.RepairOpenXrFeatures(BuildTargetGroup.Android));
 
         AssetDatabase.SaveAssets();
 
-        Debug.Log("[XR Baslangic Onarimi]\n" + report);
-        EditorUtility.DisplayDialog("Editörde XR Başlatma", report.ToString(), "Tamam");
+        report.AppendLine();
+        report.AppendLine("Unity'yi KAPATIP yeniden acin - XR yapilandirmasi acilista okunur.");
+
+        Debug.Log("[XR Onarimi]\n" + report);
+        EditorUtility.DisplayDialog("Editörde VR Testini Onar", report.ToString(), "Tamam");
     }
 
-    [MenuItem("Tools/Gece Vardiyası/Editörde XR Başlatmayı Aç (geri al)", false, 44)]
-    public static void RestoreFromMenu()
+    [MenuItem("Tools/Gece Vardiyası/Editörde XR Başlatmayı Kapat (acil çıkış)", false, 44)]
+    public static void DisableFromMenu()
     {
-        string result = SetStandaloneXrInitOnStart(true);
+        string result = SetStandaloneXrInitOnStart(false);
         AssetDatabase.SaveAssets();
 
-        Debug.Log("[XR Baslangic Onarimi]\n" + result);
+        Debug.Log("[XR Onarimi]\n" + result);
         EditorUtility.DisplayDialog("Editörde XR Başlatma", result, "Tamam");
     }
 
-    // ------------------------------------------------- bozuk ozellik girdileri
+    // ------------------------------------------------------ temiz yapilandirma
 
     /// <summary>
-    /// Aktif OpenXR ayar varligindaki, scripti cozulemeyen (null) ozellik
-    /// girdilerini listeden cikarir. Bunlar Unity'nin "referenced script is
-    /// missing" uyarisinin kaynagidir.
+    /// Aktif XR ayar nesnelerini template'in kopyalarindan projenin kendi temiz
+    /// varliklarina cevirir. Bozuk ozellik girdisi boylece devreden tamamen cikar.
     /// </summary>
-    static string RemoveBrokenOpenXrFeatures()
+    static string SwitchToCleanXrConfig()
     {
-        if (!EditorBuildSettings.TryGetConfigObject(OpenXrSettingsKey, out Object settingsObject) ||
-            settingsObject == null)
-            return "OpenXR: aktif ayar varligi bulunamadi, ozellik temizligi atlandi.";
+        StringBuilder result = new StringBuilder();
 
-        SerializedObject packageSo = new SerializedObject(settingsObject);
-        int removedTotal = 0;
-        List<string> touched = new List<string>();
+        result.AppendLine(SwitchConfigObject(LoaderSettingsKey, CleanLoaderSettingsPath,
+            "XR loader ayarlari"));
+        result.Append(SwitchConfigObject(OpenXrSettingsKey, CleanOpenXrSettingsPath,
+            "OpenXR paket ayarlari"));
 
-        SerializedProperty iterator = packageSo.GetIterator();
-        while (iterator.NextVisible(true))
-        {
-            if (iterator.propertyType != SerializedPropertyType.ObjectReference ||
-                iterator.objectReferenceValue == null)
-                continue;
+        return result.ToString();
+    }
 
-            // Her build target'in kendi OpenXRSettings nesnesi var; icindeki
-            // "features" dizisini ayri bir SerializedObject ile temizliyoruz.
-            SerializedObject perTarget = new SerializedObject(iterator.objectReferenceValue);
-            SerializedProperty features = perTarget.FindProperty("features");
-            if (features == null || !features.isArray)
-                continue;
+    static string SwitchConfigObject(string key, string cleanAssetPath, string label)
+    {
+        Object clean = AssetDatabase.LoadAssetAtPath<Object>(cleanAssetPath);
+        if (clean == null)
+            return $"{label}: HATA - {cleanAssetPath} bulunamadi.";
 
-            int removed = 0;
-            for (int i = features.arraySize - 1; i >= 0; i--)
-            {
-                SerializedProperty element = features.GetArrayElementAtIndex(i);
-                if (element.propertyType != SerializedPropertyType.ObjectReference)
-                    continue;
+        EditorBuildSettings.TryGetConfigObject(key, out Object current);
+        if (current == clean)
+            return $"{label}: zaten temiz varlik kullaniliyor ({cleanAssetPath}).";
 
-                // Scripti kayip bir MonoBehaviour burada NULL gorunur.
-                if (element.objectReferenceValue == null)
-                {
-                    features.DeleteArrayElementAtIndex(i);
-                    removed++;
-                }
-            }
+        string previous = current != null
+            ? AssetDatabase.GetAssetPath(current)
+            : "(atanmamis)";
 
-            if (removed <= 0)
-                continue;
-
-            perTarget.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(iterator.objectReferenceValue);
-            removedTotal += removed;
-            touched.Add($"{iterator.objectReferenceValue.name} ({removed})");
-        }
-
-        EditorUtility.SetDirty(settingsObject);
-
-        return removedTotal == 0
-            ? "OpenXR: bozuk (scripti kayip) ozellik girdisi bulunamadi."
-            : $"OpenXR: {removedTotal} bozuk ozellik girdisi SILINDI -> " + string.Join(", ", touched);
+        EditorBuildSettings.AddConfigObject(key, clean, true);
+        return $"{label}: {previous}\n    -> {cleanAssetPath}";
     }
 
     // --------------------------------------------- Standalone XR init anahtari
 
     /// <summary>
-    /// Editorde Play, Standalone XR ayarlarini kullanir. Bu anahtar kapatilinca
-    /// Play artik gozlugu ayaga kaldirmaya calismaz; oyun masaustu penceresinde
-    /// calisir ve ag katmani aynen test edilebilir. ANDROID AYARI DEGISMEZ.
+    /// Editorde Play, Standalone XR ayarlarini kullanir. Gozlukle test edebilmek
+    /// icin bu bayrak ACIK olmali. Android ayarina dokunulmaz.
     /// </summary>
-    static string SetStandaloneXrInitOnStart(bool enabled)
+    public static string SetStandaloneXrInitOnStart(bool enabled)
     {
         if (!EditorBuildSettings.TryGetConfigObject(LoaderSettingsKey, out Object loaderSettings) ||
             loaderSettings == null)
@@ -156,20 +142,32 @@ public static class XrStartupRepair
             if (initOnStart == null)
                 return "XR Management: m_InitManagerOnStart alani bulunamadi.";
 
-            bool before = initOnStart.boolValue;
             initOnStart.boolValue = enabled;
             entrySo.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(entry);
+
+            // Loader yoneticisinin otomatik yuklemesi de acik olmali, yoksa
+            // "Initialize XR on Startup" isaretli olsa bile gozluk ayaga kalkmaz.
+            SerializedProperty manager = entrySo.FindProperty("m_LoaderManagerInstance");
+            if (manager != null && manager.objectReferenceValue != null)
+            {
+                SerializedObject managerSo = new SerializedObject(manager.objectReferenceValue);
+                SerializedProperty automaticLoading = managerSo.FindProperty("m_AutomaticLoading");
+                SerializedProperty automaticRunning = managerSo.FindProperty("m_AutomaticRunning");
+                if (automaticLoading != null)
+                    automaticLoading.boolValue = enabled;
+                if (automaticRunning != null)
+                    automaticRunning.boolValue = enabled;
+                managerSo.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(manager.objectReferenceValue);
+            }
+
             EditorUtility.SetDirty(loaderSettings);
 
-            if (before == enabled)
-                return $"Editor (Standalone) XR baslatma zaten {(enabled ? "ACIK" : "KAPALI")}. " +
-                       "Android ayari degistirilmedi.";
-
             return enabled
-                ? "Editor (Standalone) XR baslatma ACILDI. Play artik gozlugu ayaga kaldirmayi dener."
-                : "Editor (Standalone) XR baslatma KAPATILDI. Play artik masaustu penceresinde " +
-                  "calisir ve cokmez. ANDROID AYARI DEGISMEDI - APK'da VR aynen calisir.";
+                ? "Editor (Standalone) XR baslatma ACIK. Play'e basinca gozluk devreye girer."
+                : "Editor (Standalone) XR baslatma KAPALI. Play masaustu penceresinde calisir. " +
+                  "ANDROID AYARI DEGISMEDI.";
         }
 
         return "XR Management: Standalone girdisi bulunamadi.";
