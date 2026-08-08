@@ -47,7 +47,13 @@ public static class XrStartupRepair
 
         report.AppendLine(SwitchToCleanXrConfig());
         report.AppendLine();
-        report.AppendLine(SetStandaloneXrInitOnStart(true));
+        QuestLinkGraphicsRepair.EnsureD3D11();
+        report.AppendLine("Windows grafik API'si Quest Link icin Direct3D11'e sabitlendi.");
+        report.AppendLine();
+        // Unity 6 + Meta Link, hazir olmayan bir PC VR oturumunda OpenXR'i
+        // otomatik baslatirken native tarafta kilitlenebiliyor. Windows XR'ini
+        // AirLinkSafeXrBootstrap yalnizca Link gercekten hazirken baslatir.
+        report.AppendLine(SetStandaloneXrInitOnStart(false));
         report.AppendLine();
         report.AppendLine(XrInputRepair.RepairOpenXrFeatures(BuildTargetGroup.Standalone));
         report.AppendLine();
@@ -111,8 +117,9 @@ public static class XrStartupRepair
     // --------------------------------------------- Standalone XR init anahtari
 
     /// <summary>
-    /// Editorde Play, Standalone XR ayarlarini kullanir. Gozlukle test edebilmek
-    /// icin bu bayrak ACIK olmali. Android ayarina dokunulmaz.
+    /// Editorde Play, Standalone XR ayarlarini kullanir. Bu bayrak kapaliyken
+    /// AirLinkSafeXrBootstrap XR'i yalnizca Meta PC VR oturumu hazirsa elle
+    /// baslatir. Android ayarina dokunulmaz.
     /// </summary>
     public static string SetStandaloneXrInitOnStart(bool enabled)
     {
@@ -165,9 +172,9 @@ public static class XrStartupRepair
             EditorUtility.SetDirty(loaderSettings);
 
             return enabled
-                ? "Editor (Standalone) XR baslatma ACIK. Play'e basinca gozluk devreye girer."
-                : "Editor (Standalone) XR baslatma KAPALI. Play masaustu penceresinde calisir. " +
-                  "ANDROID AYARI DEGISMEDI.";
+                ? "Editor (Standalone) otomatik XR baslatma ACIK."
+                : "Editor (Standalone) otomatik XR baslatma KAPALI. " +
+                  "Air Link hazirsa guvenli baslatici XR'i elle acar. ANDROID AYARI DEGISMEDI.";
         }
 
         return "XR Management: Standalone girdisi bulunamadi.";

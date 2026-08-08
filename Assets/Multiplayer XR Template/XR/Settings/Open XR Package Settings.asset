@@ -153,7 +153,7 @@ MonoBehaviour:
   - {fileID: -5941725581135416239}
   - {fileID: 7009867266914750043}
   - {fileID: -6024546777161485163}
-  - {fileID: -6350047067895735620}
+  - {fileID: 4325660641313652592}
   - {fileID: -690766299245189921}
   - {fileID: 7751228045368503775}
   - {fileID: 8157482721945908042}
@@ -1045,8 +1045,8 @@ MonoBehaviour:
   features:
   - {fileID: -26858401202852733}
   - {fileID: 6310755902545545824}
-  - {fileID: 5487315085652391421}
-  - {fileID: -5170624231289186651}
+  - {fileID: 5562333765786175448}
+  - {fileID: -5543639920907004968}
   - {fileID: 4117382365159756022}
   - {fileID: -5686177324229255274}
   - {fileID: 8441450413355064930}
@@ -1057,7 +1057,7 @@ MonoBehaviour:
   - {fileID: -40984751935347744}
   - {fileID: 6693785109949757185}
   - {fileID: 6256046882426700881}
-  - {fileID: 3708807343660529324}
+  - {fileID: 6508531829680340833}
   - {fileID: 2142938838686582127}
   - {fileID: -590851228402724440}
   - {fileID: -3946252854046381403}
@@ -1773,7 +1773,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5019471fb2174e5c852ecd4047163007, type: 3}
   m_Name: HandInteractionProfile Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Hand Interaction Profile
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.handinteraction
@@ -2106,7 +2106,7 @@ MonoBehaviour:
   m_Name: WebGL
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -9009533477231897449}
+  - {fileID: -51630427813541062}
   customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0
@@ -2289,7 +2289,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e314dfef9af0904e80129bcc0a79361, type: 3}
   m_Name: HandTracking Standalone
   m_EditorClassIdentifier: Unity.XR.Hands::UnityEngine.XR.Hands.OpenXR.HandTracking
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Hand Tracking Subsystem
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.handtracking

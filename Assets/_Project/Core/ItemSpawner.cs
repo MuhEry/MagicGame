@@ -156,6 +156,7 @@ public class ItemSpawner : MonoBehaviour
         {
             // Projedeki yerel Instantiate çağrısı yalnızca offline oyun için burada tutulur.
             CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+            DisableOfflineNetworkComponents(CurrentSpawnedItem);
         }
 
         if (CurrentSpawnedItem == null)
@@ -174,6 +175,33 @@ public class ItemSpawner : MonoBehaviour
         ItemSpawned?.Invoke(CurrentSpawnedItem);
 
         return CurrentSpawnedItem;
+    }
+
+    /// <summary>
+    /// Oda disinda uretilen esyalar yerel fizik ve XRI ile calisir. Alteruna servis
+    /// baslatilmadigi icin paket bilesenlerini acik birakmak, RigidbodySynchronizable
+    /// FixedUpdate/ForceUpdate yolunda her kare NullReferenceException uretir.
+    /// </summary>
+    static void DisableOfflineNetworkComponents(GameObject item)
+    {
+        if (item == null)
+            return;
+
+        foreach (MonoBehaviour behaviour in item.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (behaviour == null)
+                continue;
+
+            string componentNamespace = behaviour.GetType().Namespace;
+            bool isAlterunaComponent =
+                !string.IsNullOrEmpty(componentNamespace) &&
+                componentNamespace.StartsWith("Alteruna", StringComparison.Ordinal);
+            bool isProjectNetworkComponent =
+                behaviour is ItemOwnership || behaviour is NetworkItemState;
+
+            if (isAlterunaComponent || isProjectNetworkComponent)
+                behaviour.enabled = false;
+        }
     }
 
     public void StopSpawning()

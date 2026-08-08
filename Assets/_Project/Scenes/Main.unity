@@ -2708,7 +2708,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OfflineRigFallback
   rigTemplate: {fileID: 1389751815}
-  offlineActivationDelay: 5
+  watchdogDelay: 12
 --- !u!114 &1174280485
 MonoBehaviour:
   m_ObjectHideFlags: 0

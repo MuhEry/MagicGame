@@ -39,16 +39,36 @@ public static class XrInputRepair
         "Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/XRI Default Input Actions.inputactions";
 
     /// <summary>
-    /// Quest 2 + Hands rig icin gereken asgari OpenXR ozellikleri.
-    /// nameUi ile eslestiriyoruz; feature id string'leri paket surumleri arasinda degisebiliyor.
+    /// PC Air Link testinde yalnızca hareket kontrolcusu profilleri gerekir. El
+    /// takibi ve Meta Android yasam dongusu Editor'de acilirsa Meta RuntimeIPC,
+    /// Android servislerini Windows'ta baslatmaya calisip Editor'u kapatabiliyor.
+    /// APK tarafinda ise Quest ve el takibi ozellikleri korunur.
     /// </summary>
-    static readonly string[] k_RequiredFeatureNames =
+    static readonly string[] k_StandaloneRequiredFeatureNames =
+    {
+        "Oculus Touch Controller Profile",
+        "Meta Quest Touch Plus Controller Profile",
+    };
+
+    static readonly string[] k_AndroidRequiredFeatureNames =
     {
         "Meta Quest Support",
         "Oculus Touch Controller Profile",
+        "Meta Quest Touch Plus Controller Profile",
         "Hand Tracking Subsystem",
         "Hand Interaction Profile",
     };
+
+    static readonly string[] k_StandaloneDisabledFeatureNames =
+    {
+        "Hand Tracking Subsystem",
+        "Hand Interaction Profile",
+        "Meta Hand Tracking Aim",
+        "Meta Quest: Display Utilities",
+        "Composition Layers Support",
+    };
+
+    const string MetaOpenXrLifeCycleFeatureId = "MetaOpenXR-OpenXRLifeCycle";
 
     [MenuItem("Tools/Gece Vardiyası/VR Girdisini Onar (OpenXR + Input Actions)", false, 42)]
     public static void RepairFromMenu()
@@ -84,9 +104,14 @@ public static class XrInputRepair
 
         FeatureHelpers.RefreshFeatures(targetGroup);
 
+        string[] requiredFeatureNames = targetGroup == BuildTargetGroup.Standalone
+            ? k_StandaloneRequiredFeatureNames
+            : k_AndroidRequiredFeatureNames;
+
         List<string> turnedOn = new List<string>();
+        List<string> turnedOff = new List<string>();
         List<string> alreadyOn = new List<string>();
-        List<string> notFound = new List<string>(k_RequiredFeatureNames);
+        List<string> notFound = new List<string>(requiredFeatureNames);
 
         foreach (OpenXRFeature feature in settings.GetFeatures())
         {
@@ -94,7 +119,27 @@ public static class XrInputRepair
                 continue;
 
             string label = ReadNameUi(feature);
-            string match = k_RequiredFeatureNames
+            string featureId = ReadFeatureId(feature);
+
+            bool disableForStandalone = targetGroup == BuildTargetGroup.Standalone &&
+                (k_StandaloneDisabledFeatureNames.Any(blocked =>
+                     string.Equals(label, blocked, System.StringComparison.OrdinalIgnoreCase)) ||
+                 string.Equals(featureId, MetaOpenXrLifeCycleFeatureId,
+                     System.StringComparison.OrdinalIgnoreCase));
+
+            if (disableForStandalone)
+            {
+                if (feature.enabled)
+                {
+                    feature.enabled = false;
+                    EditorUtility.SetDirty(feature);
+                    turnedOff.Add(string.IsNullOrEmpty(label) ? featureId : label);
+                }
+
+                continue;
+            }
+
+            string match = requiredFeatureNames
                 .FirstOrDefault(wanted => string.Equals(label, wanted, System.StringComparison.OrdinalIgnoreCase));
 
             if (match == null)
@@ -121,6 +166,8 @@ public static class XrInputRepair
         result.AppendLine(turnedOn.Count > 0
             ? "  ACILDI: " + string.Join(", ", turnedOn)
             : "  Acilacak yeni ozellik yoktu.");
+        if (turnedOff.Count > 0)
+            result.AppendLine("  PC AIR LINK ICIN KAPATILDI: " + string.Join(", ", turnedOff));
         if (alreadyOn.Count > 0)
             result.AppendLine("  Zaten acikti: " + string.Join(", ", alreadyOn));
         if (notFound.Count > 0)
@@ -138,6 +185,13 @@ public static class XrInputRepair
         SerializedObject so = new SerializedObject(feature);
         SerializedProperty property = so.FindProperty("nameUi");
         return property != null ? property.stringValue : feature.GetType().Name;
+    }
+
+    static string ReadFeatureId(OpenXRFeature feature)
+    {
+        SerializedObject so = new SerializedObject(feature);
+        SerializedProperty property = so.FindProperty("featureIdInternal");
+        return property != null ? property.stringValue : string.Empty;
     }
 
     // ----------------------------------------------------------- Input Actions
