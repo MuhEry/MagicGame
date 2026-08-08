@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d99e5c3fe85268347b9fea43b9c03f7e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Materials/Hats/LightGray.mat
+  uploadId: 907446

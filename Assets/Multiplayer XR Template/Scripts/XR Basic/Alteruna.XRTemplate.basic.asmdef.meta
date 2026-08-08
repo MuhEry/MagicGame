@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 399a44f19ce305a468c2829a54ea8408
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Basic/Alteruna.XRTemplate.basic.asmdef
+  uploadId: 907446

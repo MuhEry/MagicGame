@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 613f05856090f9448a574fc1c2108c2d
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Editor/Alteruna.XRTemplate.Editor.asmdef
+  uploadId: 907446

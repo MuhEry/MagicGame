@@ -5,3 +5,10 @@ PrefabImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/DemoAssets/Prefabs/UI/MinMaxSlider.prefab
+  uploadId: 907446

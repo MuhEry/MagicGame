@@ -99,9 +99,23 @@ public class CategorySocket : XRSocketInteractor
     }
 
     /// <inheritdoc />
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+
+        // Faz 2: dogru esyanin rafa girmesi her istemcide AYRI AYRI, yerel soket
+        // olayindan tetikleniyordu. Fizik iki cihazda birebir ayni olmadigi icin
+        // esya bir oyuncuda kaybolup digerinde tezgahta kalabiliyordu. Host karari
+        // yayinladiginda bu olay eksik kalan istemcide de ayni yerlesimi yapar.
+        NetworkShiftCoordinator.ItemConsumed += HandleNetworkItemConsumed;
+    }
+
+    /// <inheritdoc />
     protected override void OnDisable()
     {
         base.OnDisable();
+
+        NetworkShiftCoordinator.ItemConsumed -= HandleNetworkItemConsumed;
 
         // Soket devre disi kalirsa coroutine'ler oldurulur ama bayraklar kalir.
         // Sifirlanmazsa dolap tekrar acildiginda kilitli kalir ve hicbir esya kabul etmez.
@@ -109,6 +123,32 @@ public class CategorySocket : XRSocketInteractor
         m_Accepting = false;
         m_RejectRoutine = null;
         m_AcceptRoutine = null;
+    }
+
+    /// <summary>
+    /// Host "su esya tuketildi" dedi. Bu dolap o kategoriye bakiyorsa ve esya hala
+    /// ortalikta duruyorsa ayni rafa yerlestirir. Zaten yerlesmisse hicbir sey yapmaz
+    /// (idempotent) - host kendi yayininin geri donusunu ikinci kez islemesin diye.
+    /// </summary>
+    void HandleNetworkItemConsumed(int itemId)
+    {
+        foreach (var identity in FindObjectsByType<ItemIdentity>(FindObjectsSortMode.None))
+        {
+            if (identity == null || identity.ItemData == null || identity.ItemId != itemId)
+                continue;
+
+            if (identity.ItemData.category != m_AcceptedCategory)
+                return; // Esya bu dolabin isi degil.
+
+            var grab = identity.GetComponentInChildren<XRGrabInteractable>(true);
+            if (grab == null || !grab.enabled)
+                return; // Zaten tuketilmis (Store grab'i kapatir).
+
+            if (m_ShelfRack == null || !m_ShelfRack.Store(grab))
+                Destroy(identity.gameObject);
+
+            return;
+        }
     }
 
     /// <inheritdoc />
@@ -301,6 +341,7 @@ public class CategorySocket : XRSocketInteractor
         m_Accepting = true;
 
         var itemTransform = interactable?.transform;
+        TryResolveItem(interactable, out var consumedItemId, out _, out _);
 
         if (m_AcceptDelay > 0f)
             yield return new WaitForSeconds(m_AcceptDelay);
@@ -325,6 +366,10 @@ public class CategorySocket : XRSocketInteractor
             // Eski prefablar raf yoneticisi olmadan da calismaya devam eder.
             Destroy(itemTransform.gameObject);
         }
+
+        // Host, ayni tuketimi diger gozlukte de garanti eder. Cevrimdisi oyunda
+        // ve istemcide bu cagri sessizce hicbir sey yapmaz.
+        NetworkShiftCoordinator.Instance?.BroadcastItemConsumed(consumedItemId);
 
         m_Accepting = false;
         m_AcceptRoutine = null;

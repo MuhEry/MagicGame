@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 9f6b4312387abb942aff8d1f4615b10c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Interaction/ActionBasedControllerManager.cs
+  uploadId: 907446

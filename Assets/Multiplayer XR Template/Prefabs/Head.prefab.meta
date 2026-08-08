@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2f192acf5ff613644b45db5067bd7d44
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Prefabs/Head.prefab
+  uploadId: 907446

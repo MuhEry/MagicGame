@@ -36,6 +36,7 @@ public class ShiftManager : MonoBehaviour
     [SerializeField, Min(1f)] private float shiftDurationSeconds = 90f;
     [SerializeField, Min(0f)] private float nextItemDelaySeconds = 0.5f;
     [SerializeField] private ItemSpawner itemSpawner;
+    [SerializeField] private NetworkShiftCoordinator networkCoordinator;
 
     private readonly Dictionary<ItemCategory, int> incorrectByCategory =
         new Dictionary<ItemCategory, int>();
@@ -73,6 +74,9 @@ public class ShiftManager : MonoBehaviour
 
         if (itemSpawner == null)
             itemSpawner = FindFirstObjectByType<ItemSpawner>();
+
+        if (networkCoordinator == null)
+            networkCoordinator = FindFirstObjectByType<NetworkShiftCoordinator>();
     }
 
     private void OnDestroy()
@@ -91,6 +95,30 @@ public class ShiftManager : MonoBehaviour
     /// UI'daki "Yeni Vardiya" butonunun çağıracağı metot.
     /// </summary>
     public void StartShift()
+    {
+        if (networkCoordinator == null)
+            networkCoordinator = NetworkShiftCoordinator.Instance;
+
+        if (networkCoordinator != null && networkCoordinator.IsInRoom)
+        {
+            networkCoordinator.RequestStartShift();
+            return;
+        }
+
+        StartShiftOffline();
+    }
+
+    public void StartShiftOffline()
+    {
+        StartShiftInternal(null, true);
+    }
+
+    public void StartShiftFromNetwork(int synchronizedSeed, bool runAuthoritativeTimer)
+    {
+        StartShiftInternal(synchronizedSeed, runAuthoritativeTimer);
+    }
+
+    void StartShiftInternal(int? synchronizedSeed, bool runAuthoritativeTimer)
     {
         if (State == ShiftState.Vardiya)
         {
@@ -123,17 +151,41 @@ public class ShiftManager : MonoBehaviour
         }
         else
         {
+            if (synchronizedSeed.HasValue)
+                itemSpawner.SetSeed(synchronizedSeed.Value);
+
             itemSpawner.BeginShift();
-            itemSpawner.SpawnNext();
+            if (runAuthoritativeTimer)
+                itemSpawner.SpawnNext();
         }
 
-        timerRoutine = StartCoroutine(RunShiftTimer());
+        if (runAuthoritativeTimer)
+            timerRoutine = StartCoroutine(RunShiftTimer());
     }
 
     /// <summary>
     /// B'nin CategorySocket sistemi oyuncu bir eşyayı dolaba bıraktığında bu metodu çağırır.
     /// </summary>
     public void RegisterDecision(
+        int itemId,
+        ItemCategory correct,
+        ItemCategory chosen,
+        float inspectMs,
+        int shakeCount)
+    {
+        if (networkCoordinator == null)
+            networkCoordinator = NetworkShiftCoordinator.Instance;
+
+        if (networkCoordinator != null && networkCoordinator.IsInRoom)
+        {
+            networkCoordinator.SubmitDecision(itemId, correct, chosen, inspectMs, shakeCount);
+            return;
+        }
+
+        ApplyDecisionFromNetwork(itemId, correct, chosen, inspectMs, shakeCount);
+    }
+
+    public void ApplyDecisionFromNetwork(
         int itemId,
         ItemCategory correct,
         ItemCategory chosen,
@@ -188,6 +240,31 @@ public class ShiftManager : MonoBehaviour
     /// </summary>
     public void EndShift()
     {
+        if (networkCoordinator == null)
+            networkCoordinator = NetworkShiftCoordinator.Instance;
+
+        if (networkCoordinator != null && networkCoordinator.IsInRoom && !networkCoordinator.IsHost)
+            return;
+
+        CompleteShift();
+    }
+
+    public void EndShiftFromNetwork()
+    {
+        CompleteShift();
+    }
+
+    public void ApplyNetworkClock(float synchronizedRemainingSeconds)
+    {
+        if (State != ShiftState.Vardiya)
+            return;
+
+        remainingSeconds = Mathf.Clamp(synchronizedRemainingSeconds, 0f, shiftDurationSeconds);
+        PublishTime();
+    }
+
+    void CompleteShift()
+    {
         if (State != ShiftState.Vardiya)
             return;
 
@@ -228,6 +305,12 @@ public class ShiftManager : MonoBehaviour
     private void QueueNextItem()
     {
         if (itemSpawner == null || State != ShiftState.Vardiya)
+            return;
+
+        if (networkCoordinator == null)
+            networkCoordinator = NetworkShiftCoordinator.Instance;
+
+        if (networkCoordinator != null && networkCoordinator.IsInRoom && !networkCoordinator.IsHost)
             return;
 
         if (nextItemRoutine != null)

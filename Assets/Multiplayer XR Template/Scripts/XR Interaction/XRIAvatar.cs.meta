@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 7c7c3ed87df41e441b0fe6a45dead8b1
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scripts/XR Interaction/XRIAvatar.cs
+  uploadId: 907446

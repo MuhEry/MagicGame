@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a7d72264177930f42b521ed7c09eb8e2
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Scenes/XR Basic.unity
+  uploadId: 907446

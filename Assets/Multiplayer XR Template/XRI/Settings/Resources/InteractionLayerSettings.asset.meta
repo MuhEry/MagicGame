@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 10d1cbd68f8ae6240bcaa2ce7e7f02eb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/XRI/Settings/Resources/InteractionLayerSettings.asset
+  uploadId: 907446

@@ -19,9 +19,12 @@ public class ShiftHudPresenter : MonoBehaviour
     [SerializeField] private TMP_Text reportText;
 
     private bool isSubscribed;
+    private LocalPlayerHud localPlayerHud;
 
     private void Awake()
     {
+        localPlayerHud = GetComponent<LocalPlayerHud>();
+
         if (shiftManager == null)
             shiftManager = ShiftManager.Instance;
     }
@@ -124,10 +127,25 @@ public class ShiftHudPresenter : MonoBehaviour
     private void ShowState(ShiftState state)
     {
         if (stateText != null)
-            stateText.text = state == ShiftState.Hazir ? "Hazır" : state == ShiftState.Vardiya ? "Vardiya" : "Vardiya Raporu";
+        {
+            string stateLabel = state == ShiftState.Hazir
+                ? "Hazır"
+                : state == ShiftState.Vardiya ? "Vardiya" : "Vardiya Raporu";
+            stateText.text = localPlayerHud != null
+                ? localPlayerHud.ContextLabel + "\n" + stateLabel
+                : stateLabel;
+        }
 
         if (reportPanel != null)
             reportPanel.SetActive(state == ShiftState.Rapor);
+    }
+
+    public void RefreshPlayerContext()
+    {
+        if (shiftManager == null)
+            shiftManager = ShiftManager.Instance;
+
+        ShowState(shiftManager != null ? shiftManager.State : ShiftState.Hazir);
     }
 
     private void ShowReport(ShiftReport report)

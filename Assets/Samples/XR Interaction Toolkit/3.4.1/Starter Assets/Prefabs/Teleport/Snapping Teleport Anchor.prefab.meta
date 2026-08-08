@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ac427eab945a6ea40bb32d86d15b8db4
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Samples/XR Interaction Toolkit/3.4.1/Starter Assets/Prefabs/Teleport/Snapping
+    Teleport Anchor.prefab
+  uploadId: 907446

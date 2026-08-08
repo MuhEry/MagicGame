@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 28fe04729daeb2345bebc951fad25769
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/XR/Loaders/Open XR Loader.asset
+  uploadId: 907446

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eed7063f532a54f4ba055ccf797694d7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 270882
+  packageName: Multiplayer XR Template
+  packageVersion: 1.1.0
+  assetPath: Assets/Multiplayer XR Template/Materials/Hats/Gold.mat
+  uploadId: 907446
