@@ -13,39 +13,14 @@ public static class MultiplayerProjectSetup
     const string MainScenePath = "Assets/_Project/Scenes/Main.unity";
     const string BaseItemPrefabPath = "Assets/_Project/Items/Prefabs/item.prefab";
 
-    [InitializeOnLoadMethod]
-    static void ScheduleAutomaticSetup()
-    {
-        // A script reload may finish while Play Mode is active. Retry until Unity is
-        // safely back in Edit Mode instead of silently skipping the one-time setup.
-        EditorApplication.update -= TryAutomaticSetup;
-        EditorApplication.update += TryAutomaticSetup;
-    }
-
-    static void TryAutomaticSetup()
-    {
-        if (EditorApplication.isPlayingOrWillChangePlaymode ||
-            EditorApplication.isCompiling || EditorApplication.isUpdating)
-            return;
-
-        if (SceneManager.GetActiveScene().path != MainScenePath)
-            return;
-
-        EditorApplication.update -= TryAutomaticSetup;
-        if (SetupLooksComplete())
-            return;
-
-        try
-        {
-            ApplySetup(false);
-        }
-        catch (System.Exception exception)
-        {
-            Debug.LogException(exception);
-        }
-    }
-
-    static bool SetupLooksComplete()
+    // DIKKAT: Burada BILEREK [InitializeOnLoadMethod] YOK.
+    //
+    // Eski surum, Main.unity her acildiginda sahneyi kendiliginden degistirip
+    // EditorSceneManager.SaveScene ile KAYDEDIYORDU. Sonuc: iki kisi ayni sahneyi
+    // acinca herkeste farkli bir Main.unity olusuyor, git surekli catisiyor ve
+    // elle yapilan duzeltmeler bir sonraki acilista geri aliniyordu.
+    // Kurulum artik yalnizca menuden, kullanicinin istegiyle calisir.
+    public static bool SetupLooksComplete()
     {
         GameObject multiplayerGo = GameObject.Find("Multiplayer");
         GameObject rig = GameObject.Find("XR Origin Hands (XR Rig)");
@@ -60,10 +35,16 @@ public static class MultiplayerProjectSetup
                itemPrefab != null && itemPrefab.GetComponentInChildren<NetworkItemState>(true) != null;
     }
 
-    [MenuItem("Tools/Gece Vardiyası/Multiplayer Kurulumunu Uygula")]
+    [MenuItem("Tools/Gece Vardiyası/Multiplayer Kurulumunu Uygula", false, 40)]
     public static void ApplySetupFromMenu()
     {
         ApplySetup(true);
+    }
+
+    /// <summary>MainSceneBuilder sahneyi sifirdan kurduktan sonra bunu cagirir.</summary>
+    public static void ApplySetupSilently()
+    {
+        ApplySetup(false);
     }
 
     static void ApplySetup(bool showDialog)
@@ -158,13 +139,35 @@ public static class MultiplayerProjectSetup
             GetOrAdd<AlterunaComponents.MultiplayerManager>(multiplayerGo);
         GetOrAdd<Alteruna.AutoJoin>(multiplayerGo);
 
-        GameObject rig = GameObject.Find("XR Origin Hands (XR Rig)");
+        GameObject rig = FindRig();
         if (rig == null)
             throw new System.InvalidOperationException("XR Origin Hands (XR Rig) bulunamadı.");
 
         AlterunaComponents.Avatar avatar = GetOrAdd<AlterunaComponents.Avatar>(rig);
         GetOrAdd<TransformSynchronizable>(rig);
         GetOrAdd<Alteruna.XRIAvatar>(rig);
+
+        // Mimari kural 8: Camera.main dogrudan cagrilmaz, PlayerRefs uzerinden alinir.
+        // Faz 2'de sahnede iki avatar oldugu icin "ana kamera" belirsizlesir; ItemProbe'un
+        // parlama kanali yanlis kafaya bakarsa parlak esya hic parlamiyor gibi gorunur.
+        //
+        // PlayerRefs BILEREK rig'in DISINDA, Systems altinda durur. Alteruna'nin
+        // XRIAvatar bileseni uzak avatari temizlerken her alt Behaviour icin
+        // type.Namespace.Length okur; global namespace'teki (namespace'siz) bir
+        // scriptte Namespace NULL doner ve NullReferenceException ile temizlik
+        // yarida kalir -> ikinci oyuncunun avatari bozuk kalir. Bu projedeki tum
+        // scriptler global namespace'te oldugu icin rig'e KENDI scriptlerimizi EKLEME.
+        PlayerRefs playerRefs = GetOrAdd<PlayerRefs>(systems);
+        Transform rigCamera = rig.GetComponentsInChildren<Transform>(true)
+            .FirstOrDefault(candidate => candidate.name == "Main Camera");
+        if (rigCamera != null)
+        {
+            SerializedObject playerRefsSo = new SerializedObject(playerRefs);
+            SerializedProperty cameraProperty = playerRefsSo.FindProperty("mainCamera");
+            if (cameraProperty != null)
+                cameraProperty.objectReferenceValue = rigCamera.GetComponent<Camera>();
+            playerRefsSo.ApplyModifiedPropertiesWithoutUndo();
+        }
 
         AddTransformSync(rig, "Main Camera");
         AddTransformSync(rig, "Left Controller");
@@ -185,12 +188,60 @@ public static class MultiplayerProjectSetup
             avatarPrefab.objectReferenceValue = avatar;
         managerSo.ApplyModifiedPropertiesWithoutUndo();
 
+        ConfigureAvatarTemplate(systems, rig);
+
         EditorUtility.SetDirty(manager);
         EditorUtility.SetDirty(networkSpawner);
         EditorUtility.SetDirty(coordinator);
         EditorUtility.SetDirty(itemSpawner);
         EditorUtility.SetDirty(shiftManager);
         EditorSceneManager.MarkSceneDirty(scene);
+    }
+
+    /// <summary>
+    /// Sahnedeki rig, Alteruna icin bir avatar SABLONUDUR ve PASIF durmalidir.
+    /// Alteruna'nin kendi ornek sahnesinde de oyle: "XR Avatar Rig" nesnesinin
+    /// m_IsActive override'i 0. Sablon aktif kalirsa kendi UID'siyle kaydolur,
+    /// Alteruna onu klonlayinca ayni UID iki nesnede olur ve orijinal rig
+    /// "Synchronizable not registered" ile senkron gonderemez hale gelir;
+    /// ayrica sahnede iki kamera ve iki AudioListener kalir.
+    /// </summary>
+    static void ConfigureAvatarTemplate(GameObject systems, GameObject rig)
+    {
+        if (rig.activeSelf)
+        {
+            rig.SetActive(false);
+            Debug.Log("[MultiplayerProjectSetup] XR rig avatar SABLONU olarak pasiflestirildi " +
+                      "(Alteruna ornek sahnesindeki desen). Oyuncu rig'ini Alteruna spawn eder.");
+        }
+
+        OfflineRigFallback fallback = GetOrAdd<OfflineRigFallback>(systems);
+        SerializedObject fallbackSo = new SerializedObject(fallback);
+        SerializedProperty template = fallbackSo.FindProperty("rigTemplate");
+        if (template != null)
+            template.objectReferenceValue = rig;
+        fallbackSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(fallback);
+    }
+
+    /// <summary>
+    /// GameObject.Find yalnizca AKTIF nesneleri bulur. Rig artik sablon oldugu icin
+    /// pasif duruyor; pasifleri de tarayan bir arama sart.
+    /// </summary>
+    public static GameObject FindRig()
+    {
+        GameObject direct = GameObject.Find("XR Origin Hands (XR Rig)");
+        if (direct != null)
+            return direct;
+
+        foreach (Transform candidate in Object.FindObjectsByType<Transform>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (candidate.parent == null && candidate.name == "XR Origin Hands (XR Rig)")
+                return candidate.gameObject;
+        }
+
+        return null;
     }
 
     static void AddTransformSync(GameObject root, string childName)

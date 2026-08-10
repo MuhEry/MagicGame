@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using Alteruna.Multiplayer.Unity;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,34 +10,30 @@ public static class MultiplayerExperienceSetup
 {
     const string MainScenePath = "Assets/_Project/Scenes/Main.unity";
 
-    [InitializeOnLoadMethod]
-    static void ScheduleSetup()
-    {
-        EditorApplication.update -= TryApplySetup;
-        EditorApplication.update += TryApplySetup;
-    }
+    /// <summary>
+    /// Iki oyuncunun merkeze olan yanal uzakligi. Eskiden 0,45 m idi: iki kisi
+    /// arasinda yalnizca 90 cm kaliyordu ve gercek hayatta ikisi de tezgaha
+    /// uzanirken fiziksel olarak birbirine giriyordu. 0,75 m ile aralari 1,5 m
+    /// olur; ikisi de tezgaha ve kendi panosuna rahat erisir.
+    /// </summary>
+    const float PlayerLateralOffset = 0.75f;
 
-    [MenuItem("Tools/Gece Vardiyası/Oyuncu Konumları ve HUD Kurulumunu Uygula")]
+    // MultiplayerProjectSetup ile ayni gerekce: sahneyi acilista kendiliginden
+    // degistirip kaydeden [InitializeOnLoadMethod] kaldirildi. Yalnizca menuden calisir.
+
+    [MenuItem("Tools/Gece Vardiyası/Oyuncu Konumları ve HUD Kurulumunu Uygula", false, 41)]
     public static void ApplyFromMenu()
     {
         ApplySetup(true);
     }
 
-    static void TryApplySetup()
+    /// <summary>MainSceneBuilder sahneyi sifirdan kurduktan sonra bunu cagirir.</summary>
+    public static void ApplySetupSilently()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode ||
-            EditorApplication.isCompiling || EditorApplication.isUpdating)
-            return;
-
-        if (SceneManager.GetActiveScene().path != MainScenePath)
-            return;
-
-        EditorApplication.update -= TryApplySetup;
-        if (!SetupLooksComplete())
-            ApplySetup(false);
+        ApplySetup(false);
     }
 
-    static bool SetupLooksComplete()
+    public static bool SetupLooksComplete()
     {
         GameObject hud1 = GameObject.Find("HUD_Player1");
         GameObject hud2 = GameObject.Find("HUD_Player2");
@@ -49,8 +46,8 @@ public static class MultiplayerExperienceSetup
         return versionMarker != null && hud1 != null && hud2 != null && spawnRoot != null &&
                hud1.GetComponent<LocalPlayerHud>() != null &&
                hud2.GetComponent<LocalPlayerHud>() != null &&
-               hud1Rect != null && Mathf.Abs(hud1Rect.anchoredPosition.x + 0.45f) < 0.01f &&
-               hud2Rect != null && Mathf.Abs(hud2Rect.anchoredPosition.x - 0.45f) < 0.01f &&
+               hud1Rect != null && Mathf.Abs(hud1Rect.anchoredPosition.x + PlayerLateralOffset) < 0.01f &&
+               hud2Rect != null && Mathf.Abs(hud2Rect.anchoredPosition.x - PlayerLateralOffset) < 0.01f &&
                spawnRoot.transform.Find("Player_1_Spawn") != null &&
                spawnRoot.transform.Find("Player_2_Spawn") != null;
     }
@@ -72,6 +69,7 @@ public static class MultiplayerExperienceSetup
             return;
         }
 
+        RemoveOrphanHudCanvases();
         ConfigurePlayerHudPair(scene);
         ConfigureSpawnPoints();
         if (GameObject.Find("PlayerExperienceSetup_v2") == null)
@@ -94,7 +92,7 @@ public static class MultiplayerExperienceSetup
             throw new System.InvalidOperationException("Main sahnesindeki HUD bulunamadı.");
 
         hud1.name = "HUD_Player1";
-        ConfigureHud(hud1, 0, new Vector3(-0.45f, 1.45f, 0.9f));
+        ConfigureHud(hud1, 0, new Vector3(-PlayerLateralOffset, 1.45f, 0.9f));
 
         GameObject hud2 = GameObject.Find("HUD_Player2");
         if (hud2 == null)
@@ -104,7 +102,7 @@ public static class MultiplayerExperienceSetup
             SceneManager.MoveGameObjectToScene(hud2, scene);
         }
 
-        ConfigureHud(hud2, 1, new Vector3(0.45f, 1.45f, 0.9f));
+        ConfigureHud(hud2, 1, new Vector3(PlayerLateralOffset, 1.45f, 0.9f));
     }
 
     static void ConfigureHud(GameObject hud, int slot, Vector3 position)
@@ -127,6 +125,90 @@ public static class MultiplayerExperienceSetup
             localHud = hud.AddComponent<LocalPlayerHud>();
         localHud.ConfigureSlot(slot);
         EditorUtility.SetDirty(localHud);
+
+        ConfigureDiagnostics(hud);
+    }
+
+    /// <summary>
+    /// Ag teshis satiri. Varsayilan olarak KAPALI durur; gozlukte sorun aranirken
+    /// Inspector'dan showOnStart isaretlenir. Odaya girilip girilmedigini,
+    /// host mu istemci mi olundugunu ve seed'i cihazda gosterir.
+    /// </summary>
+    static void ConfigureDiagnostics(GameObject hud)
+    {
+        RectTransform hudRect = hud.GetComponent<RectTransform>();
+        if (hudRect == null)
+            return;
+
+        Transform existing = hudRect.Find("Txt_AgTeshis");
+        TextMeshProUGUI label;
+        if (existing != null)
+        {
+            label = existing.GetComponent<TextMeshProUGUI>();
+        }
+        else
+        {
+            GameObject labelGo = new GameObject("Txt_AgTeshis", typeof(RectTransform));
+            labelGo.transform.SetParent(hudRect, false);
+            RectTransform labelRect = (RectTransform)labelGo.transform;
+            labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            labelRect.pivot = new Vector2(0.5f, 0.5f);
+            labelRect.anchoredPosition = new Vector2(0f, -270f);
+            labelRect.sizeDelta = new Vector2(940f, 150f);
+
+            label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.fontSize = 24f;
+            label.alignment = TextAlignmentOptions.TopLeft;
+            label.color = new Color(0.75f, 0.9f, 1f);
+            label.text = "-";
+        }
+
+        if (label == null)
+            return;
+
+        NetworkDiagnosticsHud diagnostics = hud.GetComponent<NetworkDiagnosticsHud>();
+        if (diagnostics == null)
+            diagnostics = hud.AddComponent<NetworkDiagnosticsHud>();
+
+        SerializedObject diagnosticsSo = new SerializedObject(diagnostics);
+        diagnosticsSo.FindProperty("targetText").objectReferenceValue = label;
+        diagnosticsSo.FindProperty("shiftManager").objectReferenceValue =
+            Object.FindFirstObjectByType<ShiftManager>();
+        diagnosticsSo.FindProperty("itemSpawner").objectReferenceValue =
+            Object.FindFirstObjectByType<ItemSpawner>();
+        diagnosticsSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(diagnostics);
+    }
+
+    /// <summary>
+    /// Sahnede birikmis, hicbir metni bagli olmayan HUD kopyalarini siler
+    /// (orn. "HUDCabinet"). Bunlar ShiftManager olaylarina abone oluyor ama
+    /// hicbir sey gostermiyor; sahne panelini okumayi zorlastiriyorlardi.
+    /// </summary>
+    static void RemoveOrphanHudCanvases()
+    {
+        foreach (ShiftHudPresenter presenter in
+                 Object.FindObjectsByType<ShiftHudPresenter>(FindObjectsSortMode.None))
+        {
+            if (presenter == null)
+                continue;
+
+            GameObject hud = presenter.gameObject;
+            if (hud.name == "HUD" || hud.name == "HUD_Player1" || hud.name == "HUD_Player2")
+                continue;
+
+            SerializedObject so = new SerializedObject(presenter);
+            bool hasAnyBinding =
+                so.FindProperty("remainingTimeText").objectReferenceValue != null ||
+                so.FindProperty("scoreText").objectReferenceValue != null ||
+                so.FindProperty("reportText").objectReferenceValue != null;
+
+            if (hasAnyBinding)
+                continue;
+
+            Debug.Log($"[MultiplayerExperienceSetup] Bos HUD kopyasi silindi: {hud.name}");
+            Object.DestroyImmediate(hud);
+        }
     }
 
     static void ConfigureSpawnPoints()
@@ -137,8 +219,8 @@ public static class MultiplayerExperienceSetup
 
         Transform spawn1 = GetOrCreateChild(root.transform, "Player_1_Spawn");
         Transform spawn2 = GetOrCreateChild(root.transform, "Player_2_Spawn");
-        SetSpawnTransform(spawn1, new Vector3(-0.45f, 0f, -0.75f));
-        SetSpawnTransform(spawn2, new Vector3(0.45f, 0f, -0.75f));
+        SetSpawnTransform(spawn1, new Vector3(-PlayerLateralOffset, 0f, -0.75f));
+        SetSpawnTransform(spawn2, new Vector3(PlayerLateralOffset, 0f, -0.75f));
 
         AlterunaComponents.MultiplayerManager manager =
             Object.FindFirstObjectByType<AlterunaComponents.MultiplayerManager>();
@@ -163,7 +245,8 @@ public static class MultiplayerExperienceSetup
         }
         managerSo.ApplyModifiedPropertiesWithoutUndo();
 
-        GameObject rig = GameObject.Find("XR Origin Hands (XR Rig)");
+        // Rig artik avatar sablonu oldugu icin PASIF; GameObject.Find onu bulamaz.
+        GameObject rig = MultiplayerProjectSetup.FindRig();
         if (rig != null)
             rig.transform.SetPositionAndRotation(spawn1.position, spawn1.rotation);
 

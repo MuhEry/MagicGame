@@ -129,15 +129,34 @@ public class ItemSpawner : MonoBehaviour
         if (networkedRoom && !network.IsHost)
             return null;
 
-        if (networkedRoom && networkSpawner != null)
+        if (networkedRoom)
         {
-            int prefabIndex = itemPrefabs.IndexOf(entry);
+            if (networkSpawner == null)
+            {
+                // Sessizce yerel Instantiate'e dusmek en kotu sonucu verir: host esyayi
+                // gorur, istemci bos tezgaha bakar ve kimse sebebini anlamaz.
+                Debug.LogError(
+                    "[ItemSpawner] Odadayiz ama Alteruna Spawner atanmamis. Esya uretilmedi.\n" +
+                    "Tools > Gece Vardiyasi > Multiplayer Kurulumunu Uygula komutunu calistir.", this);
+                return null;
+            }
+
+            int prefabIndex = ResolveNetworkPrefabIndex(entry.prefab);
+            if (prefabIndex < 0)
+            {
+                Debug.LogError(
+                    $"[ItemSpawner] '{entry.prefab.name}' Spawner.SpawnableObjects listesinde yok. " +
+                    "Multiplayer kurulum komutunu tekrar calistir.", this);
+                return null;
+            }
+
             CurrentSpawnedItem = networkSpawner.Spawn(prefabIndex, point.position, point.rotation);
         }
         else
         {
             // Projedeki yerel Instantiate çağrısı yalnızca offline oyun için burada tutulur.
             CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+            DisableOfflineNetworkComponents(CurrentSpawnedItem);
         }
 
         if (CurrentSpawnedItem == null)
@@ -158,9 +177,61 @@ public class ItemSpawner : MonoBehaviour
         return CurrentSpawnedItem;
     }
 
+    /// <summary>
+    /// Oda disinda uretilen esyalar yerel fizik ve XRI ile calisir. Alteruna servis
+    /// baslatilmadigi icin paket bilesenlerini acik birakmak, RigidbodySynchronizable
+    /// FixedUpdate/ForceUpdate yolunda her kare NullReferenceException uretir.
+    /// </summary>
+    static void DisableOfflineNetworkComponents(GameObject item)
+    {
+        if (item == null)
+            return;
+
+        foreach (MonoBehaviour behaviour in item.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (behaviour == null)
+                continue;
+
+            string componentNamespace = behaviour.GetType().Namespace;
+            bool isAlterunaComponent =
+                !string.IsNullOrEmpty(componentNamespace) &&
+                componentNamespace.StartsWith("Alteruna", StringComparison.Ordinal);
+            bool isProjectNetworkComponent =
+                behaviour is ItemOwnership || behaviour is NetworkItemState;
+
+            if (isAlterunaComponent || isProjectNetworkComponent)
+                behaviour.enabled = false;
+        }
+    }
+
     public void StopSpawning()
     {
         IsSpawning = false;
+    }
+
+    /// <summary>
+    /// Alteruna Spawner kendi SpawnableObjects listesinin INDEKSINI bekler.
+    /// Eski kod itemPrefabs listesindeki sirayi gonderiyordu; iki liste ayni sirada
+    /// olmadigi anda host bir esyayi, istemci bambaska bir esyayi goruyordu.
+    /// </summary>
+    int ResolveNetworkPrefabIndex(GameObject prefab)
+    {
+        if (networkSpawner == null || prefab == null)
+            return -1;
+
+        int index = networkSpawner.SpawnableObjects.IndexOf(prefab);
+        if (index >= 0)
+            return index;
+
+        // Ayni prefab farkli bir referans uzerinden gelmis olabilir (varyant/instance).
+        for (int i = 0; i < networkSpawner.SpawnableObjects.Count; i++)
+        {
+            GameObject candidate = networkSpawner.SpawnableObjects[i];
+            if (candidate != null && candidate.name == prefab.name)
+                return i;
+        }
+
+        return -1;
     }
 
     void RefillQueue()

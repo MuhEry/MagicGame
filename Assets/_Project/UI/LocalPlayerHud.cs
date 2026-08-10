@@ -56,9 +56,24 @@ public sealed class LocalPlayerHud : CommunicationBridge
     void HandleRoomJoined(RoomJoinedEvent args)
     {
         isInRoom = true;
-        isHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
-        int localSlot = Mathf.Abs(args.Controller.Me.Index) % 2;
-        SetVisible(localSlot == playerSlot);
+        RefreshRoleAndVisibility();
+    }
+
+    /// <summary>
+    /// Hangi panelin bu gozlukte gorunecegini belirler.
+    ///
+    /// Eski kod slotu "Me.Index % 2" ile secıyordu. Alteruna kullanici indeksleri
+    /// 0 ve 1 olmak zorunda degil; iki oyuncu da tek (ya da cift) indeks alirsa
+    /// IKISI DE ayni paneli acar, diger panel hicbir cihazda gorunmez.
+    /// Iki kisilik ucretsiz katmanda dogru ayrim host / istemcidir.
+    /// </summary>
+    void RefreshRoleAndVisibility()
+    {
+        if (Multiplayer == null)
+            return;
+
+        isHost = Multiplayer.Me != null && Multiplayer.Me.Index == Multiplayer.LowestUserIndex;
+        SetVisible(isHost ? playerSlot == 0 : playerSlot == 1);
     }
 
     void HandleRoomLeft(RoomLeftEvent _)
@@ -70,13 +85,13 @@ public sealed class LocalPlayerHud : CommunicationBridge
 
     void HandleOtherUserJoined(OtherUserJoinedEvent args)
     {
-        isHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
+        RefreshRoleAndVisibility();
         RefreshPresenter();
     }
 
     void HandleOtherUserLeft(OtherUserLeftEvent args)
     {
-        isHost = args.Controller.Me.Index == args.Controller.LowestUserIndex;
+        RefreshRoleAndVisibility();
         RefreshPresenter();
     }
 

@@ -97,15 +97,23 @@ static class MainSceneBuilder
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene, k_ScenePath);
 
+        // FAZ 2: bu arac eskiden yalnizca tek oyuncu sahnesini kuruyordu. Kim
+        // "Main Sahnesini Kur" derse Alteruna kurulumu (MultiplayerManager, avatar,
+        // network spawner, oyuncu baslangic noktalari, iki HUD) siliniyordu ve
+        // multiplayer sessizce geri gidiyordu. Artik ayni komut Faz 2'yi de kurar.
+        MultiplayerProjectSetup.ApplySetupSilently();
+        MultiplayerExperienceSetup.ApplySetupSilently();
+
         UpdateBuildSettings();
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
         Debug.Log(
-            "[Main] " + k_ScenePath + " kuruldu ve Build Settings guncellendi.\n" +
+            "[Main] " + k_ScenePath + " kuruldu (Faz 1 + Faz 2) ve Build Settings guncellendi.\n" +
             "Spawner'a eklenen esya sayisi: " + (spawner != null ? CountSpawnerItems(spawner) : 0) + "\n" +
-            "TEST: Play -> HUD'daki 'Yeni Vardiya' butonuna bas -> bacadan esya duser.");
+            "TEST: Play -> HUD'daki 'Yeni Vardiya' butonuna bas -> bacadan esya duser.\n" +
+            "Faz 2 kontrolu: Tools > Gece Vardiyasi > Faz 2 Kontrol Listesini Dogrula");
     }
 
     // ------------------------------------------------------------------ ortam

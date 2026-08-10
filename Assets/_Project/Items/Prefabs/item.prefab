@@ -361,6 +361,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 649c525df6058fb4ba22032802414272, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemOwnership
+  Multiplayer: {fileID: 0}
+  _uidString: 
+  Reliability: 1
+  LocalMethodBehavior: 1
 --- !u!82 &4701872520462658507
 AudioSource:
   m_ObjectHideFlags: 0

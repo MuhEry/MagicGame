@@ -170,8 +170,8 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Standalone: com.DefaultCompany.com.unity.template.vr
     Android: com.magicgameteam.gecevardiyasi
+    Standalone: com.DefaultCompany.com.unity.template.vr
   buildNumber:
     Standalone: 0
     VisionOS: 0
@@ -455,6 +455,9 @@ PlayerSettings:
   - m_BuildTarget: WebGLSupport
     m_APIs: 0b000000
     m_Automatic: 1
+  - m_BuildTarget: WindowsStandaloneSupport
+    m_APIs: 02000000
+    m_Automatic: 0
   m_BuildTargetVRSettings:
   - m_BuildTarget: Standalone
     m_Enabled: 0
@@ -743,8 +746,8 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: USE_INPUT_SYSTEM_POSE_CONTROL
-    Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;ALTERUNA;ALTERUNA_V_2_X_X_X;ALTERUNA_V_2_1_X_X;ALTERUNA_V_2_1_0_X;ALTERUNA_V_2_1_0_0
+    Android: USE_INPUT_SYSTEM_POSE_CONTROL;ALTERUNA;ALTERUNA_REGISTERED;ALTERUNA_V_2_X_X_X;ALTERUNA_V_2_1_X_X;ALTERUNA_V_2_1_0_X;ALTERUNA_V_2_1_0_0
+    Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;ALTERUNA;ALTERUNA_REGISTERED;ALTERUNA_V_2_X_X_X;ALTERUNA_V_2_1_X_X;ALTERUNA_V_2_1_1_X;ALTERUNA_V_2_1_1_1
     Windows Store Apps: USE_INPUT_SYSTEM_POSE_CONTROL
   additionalCompilerArguments: {}
   platformArchitecture: {}
