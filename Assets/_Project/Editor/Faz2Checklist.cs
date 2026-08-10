@@ -223,8 +223,9 @@ public static class Faz2Checklist
         else
             Warn($"Oda kapasitesi {maxPlayers}. Ucretsiz katman 2 oyuncu ile sinirli.");
 
-        Require(GetBool(so, "ConnectOnStart", false),
-            "ConnectOnStart acik.", "ConnectOnStart kapali - istemci hicbir zaman baglanmaz.");
+        Require(!GetBool(so, "ConnectOnStart", true),
+            "ConnectOnStart kapali (AutoJoin ilk kareden sonra guvenli baglanir).",
+            "ConnectOnStart acik - Quest'te XR/sahne acilisini bloke edebilir.");
 
         SerializedProperty avatarPrefab = so.FindProperty("AvatarPrefab");
         Require(avatarPrefab != null && avatarPrefab.objectReferenceValue != null,

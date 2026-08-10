@@ -28,15 +28,26 @@ namespace Alteruna
 		{
 			if (isMe)
 			{
+				SetLocalOutputEnabled(true);
 				StartCoroutine(CharacterControllerFix());
 				return;
 			}
 
-			transform.GetChild(0).localPosition = Vector3.zero;
-			Destroy(transform.GetChild(1).gameObject);
-
+			// Uzak oyuncunun Camera/AudioListener'i Destroy'un frame sonunu
+			// beklemeden kapanmali; aksi halde bir kare bile XR cikisini ve ana
+			// AudioListener'i ele gecirebilir. Prefab child sirasina guvenme.
+			SetLocalOutputEnabled(false);
 			RemoveComponents();
 			StartCoroutine(DestroyEmptyChildrenNextFrame());
+		}
+
+		private void SetLocalOutputEnabled(bool enabled)
+		{
+			foreach (var camera in GetComponentsInChildren<Camera>(true))
+				camera.enabled = enabled;
+
+			foreach (var listener in GetComponentsInChildren<AudioListener>(true))
+				listener.enabled = enabled;
 		}
 
 		private void RemoveComponents()
@@ -72,7 +83,7 @@ namespace Alteruna
 					continue;
 				}
 
-				var name = type.Namespace;
+				var name = type.Namespace ?? string.Empty;
 				if (name.Length < XRI_NAMESPACE.Length)
 				{
 					if (name == XR_CORE_NAMESPACE) Destroy(component);
@@ -112,7 +123,8 @@ namespace Alteruna
 			// Wait until next frame
 			yield return null;
 			var cc = GetComponent<CharacterController>();
-			cc.center = new Vector3(0, cc.center.y, 0);
+			if (cc != null)
+				cc.center = new Vector3(0, cc.center.y, 0);
 		}
 
 		private bool DestroyEmptyChildren(Transform transform, ref List<Transform> toDestroy, bool enableObjs = true)

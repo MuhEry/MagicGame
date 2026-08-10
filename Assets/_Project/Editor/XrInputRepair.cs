@@ -42,7 +42,8 @@ public static class XrInputRepair
     /// PC Air Link testinde yalnızca hareket kontrolcusu profilleri gerekir. El
     /// takibi ve Meta Android yasam dongusu Editor'de acilirsa Meta RuntimeIPC,
     /// Android servislerini Windows'ta baslatmaya calisip Editor'u kapatabiliyor.
-    /// APK tarafinda ise Quest ve el takibi ozellikleri korunur.
+    /// APK tarafinda da temel Quest destegi ve Touch kontrolcu profilleri korunur;
+    /// bu controller tabanli VR surumunde kullanilmayan MR/el takibi katmanlari kapatilir.
     /// </summary>
     static readonly string[] k_StandaloneRequiredFeatureNames =
     {
@@ -55,8 +56,18 @@ public static class XrInputRepair
         "Meta Quest Support",
         "Oculus Touch Controller Profile",
         "Meta Quest Touch Plus Controller Profile",
+        "Composition Layers Support",
+    };
+
+    static readonly string[] k_AndroidDisabledFeatureNames =
+    {
+        // Bu surum controller tabanli saf VR'dir. MR/el takibi eklentileri,
+        // Quest 2 acilisinda gereksiz vendor extension'lari yuklememelidir.
         "Hand Tracking Subsystem",
         "Hand Interaction Profile",
+        "Meta Hand Tracking Aim",
+        "Meta Quest: Display Utilities",
+        "Runtime Debugger",
     };
 
     static readonly string[] k_StandaloneDisabledFeatureNames =
@@ -69,6 +80,18 @@ public static class XrInputRepair
     };
 
     const string MetaOpenXrLifeCycleFeatureId = "MetaOpenXR-OpenXRLifeCycle";
+
+    static readonly string[] k_AndroidDisabledFeatureIds =
+    {
+        // Bu proje Meta AR Foundation/scene-discovery kullanmiyor. Android XR
+        // veya Meta OpenXR yasam dongusu Quest 2'de xrDiscoverSpacesMETA
+        // aramasini tetikleyip XR acilisini bloke edebiliyor. Standart OpenXR
+        // Quest ve kontrolcu profilleri bu gizli yasam dongusune bagli degil.
+        "AndroidXR-OpenXRLifeCycle",
+        "com.unity.openxr.feature.androidxr-display-utilities",
+        "MetaOpenXR-OpenXRLifeCycle",
+        "com.unity.openxr.feature.meta-display-utilities",
+    };
 
     [MenuItem("Tools/Gece Vardiyası/VR Girdisini Onar (OpenXR + Input Actions)", false, 42)]
     public static void RepairFromMenu()
@@ -127,7 +150,13 @@ public static class XrInputRepair
                  string.Equals(featureId, MetaOpenXrLifeCycleFeatureId,
                      System.StringComparison.OrdinalIgnoreCase));
 
-            if (disableForStandalone)
+            bool disableForAndroid = targetGroup == BuildTargetGroup.Android &&
+                (k_AndroidDisabledFeatureNames.Any(blocked =>
+                     string.Equals(label, blocked, System.StringComparison.OrdinalIgnoreCase)) ||
+                 k_AndroidDisabledFeatureIds.Any(blocked =>
+                     string.Equals(featureId, blocked, System.StringComparison.OrdinalIgnoreCase)));
+
+            if (disableForStandalone || disableForAndroid)
             {
                 if (feature.enabled)
                 {
@@ -167,7 +196,9 @@ public static class XrInputRepair
             ? "  ACILDI: " + string.Join(", ", turnedOn)
             : "  Acilacak yeni ozellik yoktu.");
         if (turnedOff.Count > 0)
-            result.AppendLine("  PC AIR LINK ICIN KAPATILDI: " + string.Join(", ", turnedOff));
+            result.AppendLine(targetGroup == BuildTargetGroup.Standalone
+                ? "  PC QUEST LINK ICIN KAPATILDI: " + string.Join(", ", turnedOff)
+                : "  QUEST ILE CAKISTIGI ICIN KAPATILDI: " + string.Join(", ", turnedOff));
         if (alreadyOn.Count > 0)
             result.AppendLine("  Zaten acikti: " + string.Join(", ", alreadyOn));
         if (notFound.Count > 0)

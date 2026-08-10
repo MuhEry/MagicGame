@@ -18,7 +18,7 @@ MonoBehaviour:
   _enableLOD: 1
   _allowMultiplayerSingleton: 1
   _disableCamerasOnNonOwnedAvatars: 1
-  _enableLanDiscovery: 1
+  _enableLanDiscovery: 0
   _defaultPort: 20000
   _discoveryPort: 19090
   _format: 0

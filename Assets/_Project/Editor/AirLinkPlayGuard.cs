@@ -11,7 +11,7 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class AirLinkPlayGuard
 {
-    const string LogPrefix = "[Air Link Koruma]";
+    const string LogPrefix = "[Quest Link Koruma]";
 
     static AirLinkPlayGuard()
     {
@@ -19,12 +19,12 @@ public static class AirLinkPlayGuard
         EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
     }
 
-    [MenuItem("Tools/Gece Vardiyasi/Air Link Durumunu Kontrol Et", false, 41)]
+    [MenuItem("Tools/Gece Vardiyasi/Quest Link Durumunu Kontrol Et", false, 41)]
     static void CheckFromMenu()
     {
         bool ready = AirLinkSafeXrBootstrap.IsAirLinkReady(out string reason);
         EditorUtility.DisplayDialog(
-            ready ? "Air Link Hazir" : "Air Link Hazir Degil",
+            ready ? "Quest Link Hazir" : "Quest Link Hazir Degil",
             reason,
             "Tamam");
     }
@@ -38,7 +38,7 @@ public static class AirLinkPlayGuard
             EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneWindows)
         {
             CancelPlay(
-                "Air Link ile Editor Play testi icin aktif platform Windows olmali.\n\n" +
+                "Quest Link ile Editor Play testi icin aktif platform Windows olmali.\n\n" +
                 "File > Build Profiles > Windows secip Switch Platform yap. " +
                 "Android'i yalnizca APK alacagin zaman sec.");
             return;
@@ -53,7 +53,7 @@ public static class AirLinkPlayGuard
         EditorApplication.isPlaying = false;
         Debug.LogError($"{LogPrefix} Play engellendi. {reason}");
         EditorApplication.delayCall += () => EditorUtility.DisplayDialog(
-            "Air Link Hazir Degil - Play Baslatilmadi",
+            "Quest Link Hazir Degil - Play Baslatilmadi",
             reason +
             "\n\nGozlukte: Hizli Ayarlar > Quest Link > Baslat. " +
             "PC VR ortami tamamen acildiktan sonra kontrolculeri uyandir ve Play'e tekrar bas.",

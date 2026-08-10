@@ -52,7 +52,7 @@ public static class XrStartupRepair
         report.AppendLine();
         // Unity 6 + Meta Link, hazir olmayan bir PC VR oturumunda OpenXR'i
         // otomatik baslatirken native tarafta kilitlenebiliyor. Windows XR'ini
-        // AirLinkSafeXrBootstrap yalnizca Link gercekten hazirken baslatir.
+        // AirLinkSafeXrBootstrap USB/Air Link gercekten hazirken baslatir.
         report.AppendLine(SetStandaloneXrInitOnStart(false));
         report.AppendLine();
         report.AppendLine(XrInputRepair.RepairOpenXrFeatures(BuildTargetGroup.Standalone));
@@ -118,7 +118,7 @@ public static class XrStartupRepair
 
     /// <summary>
     /// Editorde Play, Standalone XR ayarlarini kullanir. Bu bayrak kapaliyken
-    /// AirLinkSafeXrBootstrap XR'i yalnizca Meta PC VR oturumu hazirsa elle
+    /// AirLinkSafeXrBootstrap XR'i yalnizca Meta USB/Air Link PC VR oturumu hazirsa elle
     /// baslatir. Android ayarina dokunulmaz.
     /// </summary>
     public static string SetStandaloneXrInitOnStart(bool enabled)
@@ -174,7 +174,7 @@ public static class XrStartupRepair
             return enabled
                 ? "Editor (Standalone) otomatik XR baslatma ACIK."
                 : "Editor (Standalone) otomatik XR baslatma KAPALI. " +
-                  "Air Link hazirsa guvenli baslatici XR'i elle acar. ANDROID AYARI DEGISMEDI.";
+                  "USB/Air Link hazirsa guvenli baslatici XR'i elle acar. ANDROID AYARI DEGISMEDI.";
         }
 
         return "XR Management: Standalone girdisi bulunamadi.";

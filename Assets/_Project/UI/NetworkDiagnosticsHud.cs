@@ -83,6 +83,14 @@ public sealed class NetworkDiagnosticsHud : MonoBehaviour
     {
         builder.Clear();
 
+        Alteruna.AutoJoin bootstrap = FindFirstObjectByType<Alteruna.AutoJoin>();
+        if (bootstrap != null)
+        {
+            builder.Append("BAGLANTI: ").Append(bootstrap.State);
+            builder.Append(" | ").Append(bootstrap.Status);
+            builder.AppendLine();
+        }
+
         NetworkShiftCoordinator network = NetworkShiftCoordinator.Instance;
         if (network == null)
         {

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: -789768799, guid: b67c65e7cca69014ba10c26e08a9e556, type: 3}
   m_Name: ApplicationData
   m_EditorClassIdentifier: Alteruna.Multiplayer.Unity.dll::Alteruna.Multiplayer.Unity.Configs.AlterunaApplicationData
-  _applicationId: 75f955fe-6b68-4ad5-b185-1516be16e0f5
+  _applicationId: 9db6068b-8d5d-4f4a-8594-fee7f5c0b120
   _subId: 
   _projectName: New Project
   _serverMode: 0

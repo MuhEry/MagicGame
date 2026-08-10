@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "com.alteruna.multiplayer": {
-      "version": "https://github.com/Alteruna/multiplayer-sdk-unity-package.git#0da04d5e38a8bd4be00fb74a80c0d76f37ec429c",
+      "version": "https://github.com/Alteruna/multiplayer-sdk-unity-package.git#d1bfa5a0b6e8cbd3f14eb17c5322741aa0cbbfb7",
       "depth": 0,
       "source": "git",
       "dependencies": {
@@ -10,7 +10,7 @@
         "com.unity.inputsystem": "1.7.0",
         "com.unity.nuget.newtonsoft-json": "3.2.1"
       },
-      "hash": "0da04d5e38a8bd4be00fb74a80c0d76f37ec429c"
+      "hash": "d1bfa5a0b6e8cbd3f14eb17c5322741aa0cbbfb7"
     },
     "com.unity.burst": {
       "version": "1.8.30",

@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Utilities;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.XR;
+using UnityEngine.XR.Interaction.Toolkit.Inputs;
 
 /// <summary>
 /// Oyuncu rig'i bekcisi. Sahnedeki XR rig, Alteruna icin pasif bir avatar
@@ -13,13 +15,20 @@ using UnityEngine.XR;
 /// Avatar sablonunun kendisi hicbir zaman etkinlestirilmez.
 /// </summary>
 [DisallowMultipleComponent]
+[DefaultExecutionOrder(-10000)]
 public sealed class OfflineRigFallback : MonoBehaviour
 {
     [Tooltip("Avatar sablonu olarak kullanilan, sahnede PASIF duran XR rig.")]
     [SerializeField] GameObject rigTemplate;
 
+    [Tooltip("Ilk XR karesi goruldukten sonra etkinlestirilecek Alteruna kok nesnesi.")]
+    [SerializeField] GameObject networkRoot;
+
     [Tooltip("Bu kadar saniye aktif kamera bulunamazsa bekci devreye girer.")]
     [SerializeField, Min(0.5f)] float watchdogDelay = 12f;
+
+    [Tooltip("Alteruna yerel kamerasi hazir gorundukten sonra cevrimdisi rig'in korunacagi sure.")]
+    [SerializeField, Min(0.1f)] float localRigHandoffDelay = 0.75f;
 
     float elapsed;
     float nextControllerCheck;
@@ -27,8 +36,33 @@ public sealed class OfflineRigFallback : MonoBehaviour
     bool rescued;
     bool loggedControllerOverride;
     GameObject offlineRig;
+    float localRigReadySince = -1f;
 
     float EffectiveWatchdogDelay => Mathf.Max(12f, watchdogDelay);
+
+    void Awake()
+    {
+        // Kamera ve kontrolculer herhangi bir Alteruna Awake/Start metodundan
+        // once hazir olsun. Boylece lisans veya ag islemi gecikse bile Quest
+        // bos compositor katmaninda/gri ortamda kalmaz.
+        if (HasActiveCamera())
+            return;
+
+        rescued = true;
+        Rescue();
+    }
+
+    IEnumerator Start()
+    {
+        // En az bir yerel XR karesi cizilsin; Alteruna bundan sonra baslasin.
+        yield return null;
+
+        if (networkRoot != null && !networkRoot.activeSelf)
+        {
+            networkRoot.SetActive(true);
+            Debug.Log("[Multiplayer] Ilk XR karesi hazir; Alteruna kok nesnesi etkinlestirildi.", this);
+        }
+    }
 
     void Update()
     {
@@ -49,14 +83,26 @@ public sealed class OfflineRigFallback : MonoBehaviour
         // kontrolcu/interactor takimi kalir.
         if (offlineRig != null)
         {
-            GameObject spawned = FindActiveSpawnedLocalAvatar();
-            if (spawned != null)
+            GameObject spawned = FindReadySpawnedLocalAvatar();
+            if (spawned == null)
+            {
+                localRigReadySince = -1f;
+            }
+            else if (localRigReadySince < 0f)
+            {
+                // Possession callback'i ile kamera/TrackedPoseDriver ayni karede
+                // hazir olmayabilir. Fallback kamerayi hemen kapatmak siyah kareye
+                // neden olur; yeni rig'i en az kisa bir sure saglikli tut.
+                localRigReadySince = Time.unscaledTime;
+            }
+            else if (Time.unscaledTime - localRigReadySince >= localRigHandoffDelay)
             {
                 offlineRig.SetActive(false);
                 Destroy(offlineRig);
                 offlineRig = null;
                 rescued = false;
                 elapsed = 0f;
+                localRigReadySince = -1f;
 
                 Debug.Log(
                     $"[Rig Bekcisi] Alteruna'nin yerel avatari ('{spawned.name}') hazir. " +
@@ -105,7 +151,7 @@ public sealed class OfflineRigFallback : MonoBehaviour
         {
             spawned.SetActive(true);
             Debug.LogWarning(
-                $"[Rig Bekcisi] {EffectiveWatchdogDelay:0} sn boyunca aktif kamera bulunamadi. " +
+                "[Rig Bekcisi] Aktif kamera bulunamadi. " +
                 $"Alteruna'nin spawn ettigi avatar ('{spawned.name}') acildi.", this);
             return;
         }
@@ -128,10 +174,11 @@ public sealed class OfflineRigFallback : MonoBehaviour
             rigTemplate.transform.rotation);
         offlineRig.name = rigTemplate.name + " (Offline)";
         DisableAlterunaBehaviours(offlineRig);
+        ConfigureControllerOnlyRig(offlineRig);
         offlineRig.SetActive(true);
 
         Debug.LogWarning(
-            $"[Rig Bekcisi] {EffectiveWatchdogDelay:0} sn boyunca aktif kamera bulunamadi" +
+            "[Rig Bekcisi] Aktif kamera bulunamadi" +
             (inRoom ? " (odadayiz ama Alteruna avatar acmadi)" : " (odaya girilemedi)") +
             ". Ag bilesenleri kapali gecici XR rig acildi.", this);
     }
@@ -172,10 +219,8 @@ public sealed class OfflineRigFallback : MonoBehaviour
         return null;
     }
 
-    GameObject FindActiveSpawnedLocalAvatar()
+    GameObject FindReadySpawnedLocalAvatar()
     {
-        GameObject cameraCandidate = null;
-
         foreach (Alteruna.Multiplayer.Unity.Avatar avatar in
                  FindObjectsByType<Alteruna.Multiplayer.Unity.Avatar>(
                      FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -189,18 +234,25 @@ public sealed class OfflineRigFallback : MonoBehaviour
 
             // Alteruna spawn ettigi avatarin adini kullanici/oda bilgisiyle
             // degistirebildigi icin "(Clone)" adina guvenme.
-            if (avatar.IsPossessor)
+            // Kamera aktarimi yalnizca SDK sahipligi kesinlestirdikten ve yeni
+            // rig'in aktif bir kamerası olduktan sonra yapilir. Uzak avatarin
+            // kisa sure acik kalan kamerasini yerel kamera sanma.
+            if (avatar.IsPossessor && HasUsableCamera(go))
                 return go;
-
-            // Uzak avatarlar XRIAvatar tarafindan kamera ve AudioListener'dan
-            // arindirilir. Sahiplik bayragi bir kare gec yazilsa bile aktif
-            // kamerasi kalan avatar yerel rig'dir.
-            Camera camera = go.GetComponentInChildren<Camera>(true);
-            if (camera != null && camera.enabled)
-                cameraCandidate = go;
         }
 
-        return cameraCandidate;
+        return null;
+    }
+
+    static bool HasUsableCamera(GameObject rig)
+    {
+        foreach (Camera camera in rig.GetComponentsInChildren<Camera>(true))
+        {
+            if (camera != null && camera.enabled && camera.gameObject.activeInHierarchy)
+                return true;
+        }
+
+        return false;
     }
 
     void MaintainTrackedControllerMode()
@@ -210,12 +262,14 @@ public sealed class OfflineRigFallback : MonoBehaviour
         if (!leftTracked && !rightTracked)
             return;
 
-        GameObject rig = FindActiveSpawnedLocalAvatar();
+        GameObject rig = FindReadySpawnedLocalAvatar();
         if (rig == null && offlineRig != null && offlineRig.activeInHierarchy)
             rig = offlineRig;
 
         if (rig == null)
             return;
+
+        ConfigureControllerOnlyRig(rig);
 
         bool changed = false;
         if (leftTracked)
@@ -227,7 +281,7 @@ public sealed class OfflineRigFallback : MonoBehaviour
         {
             loggedControllerOverride = true;
             Debug.Log(
-                $"[XR Kontrol] Air Link kontrolculeri izleniyor. " +
+                $"[XR Kontrol] Quest Link kontrolculeri izleniyor. " +
                 $"Sol={leftTracked}, Sag={rightTracked}; fiziksel kontrolcu gruplari etkin tutuluyor.",
                 this);
         }
@@ -252,6 +306,23 @@ public sealed class OfflineRigFallback : MonoBehaviour
         }
 
         return changed;
+    }
+
+    static void ConfigureControllerOnlyRig(GameObject rig)
+    {
+        if (rig == null)
+            return;
+
+        // Bu build'de OpenXR el takibi bilerek kapali. XRI modality manager
+        // subsystem'i her kare yeniden arayip uyari basmasin; Touch rig'i sabit tut.
+        foreach (XRInputModalityManager manager in
+                 rig.GetComponentsInChildren<XRInputModalityManager>(true))
+        {
+            manager.enabled = false;
+        }
+
+        SetInputGroup(rig, "Left Controller", "Left Hand");
+        SetInputGroup(rig, "Right Controller", "Right Hand");
     }
 
     static Transform FindDescendant(Transform root, string objectName)

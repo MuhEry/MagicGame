@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.alteruna.multiplayer": "https://github.com/Alteruna/multiplayer-sdk-unity-package.git#0da04d5e38a8bd4be00fb74a80c0d76f37ec429c",
+    "com.alteruna.multiplayer": "https://github.com/Alteruna/multiplayer-sdk-unity-package.git#d1bfa5a0b6e8cbd3f14eb17c5322741aa0cbbfb7",
     "com.unity.feature.development": "1.0.2",
     "com.unity.ide.rider": "3.0.40",
     "com.unity.inputsystem": "1.20.0",

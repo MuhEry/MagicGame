@@ -9,8 +9,8 @@ using UnityEngine.XR.Management;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
-/// Windows Editor/Player'da OpenXR'i yalnizca Meta Quest Link PC VR oturumu
-/// gercekten hazirken baslatir. Hazir olmayan runtime'a xrGetSystem cagrisi
+/// Windows Editor/Player'da OpenXR'i yalnizca Meta Quest Link (USB veya Air Link)
+/// PC VR oturumu gercekten hazirken baslatir. Hazir olmayan runtime'a xrGetSystem cagrisi
 /// yapilmasini ve Unity 6 Editor'un native OpenXR baslangicinda kilitlenmesini
 /// engeller. Android kendi otomatik XR yasam dongusunu kullanmaya devam eder.
 /// </summary>
@@ -166,7 +166,9 @@ public static class AirLinkSafeXrBootstrap
                     rightTouch = device;
             }
 
-            bool headsetReady = IsConnectedAndActive(headset) && headset.isUsingAirLink;
+            // isUsingAirLink yalnizca baglanti turunu bildirir. USB Quest Link'te
+            // false olmasi beklenir ve kulakligin hazir olmadigi anlamina gelmez.
+            bool headsetReady = IsConnectedAndActive(headset);
             bool controllersReady =
                 IsConnectedAndActive(leftTouch) && IsConnectedAndActive(rightTouch);
             bool dashRunning = IsOculusDashRunning();
@@ -174,13 +176,14 @@ public static class AirLinkSafeXrBootstrap
             if (headsetReady && dashRunning)
             {
                 // Meta Horizon Link'in rdConnectionState alani bazi surumlerde aktif
-                // Air Link oturumunda bile "disconnected" kalabiliyor. OculusDash ve
+                // Link oturumunda bile "disconnected" kalabiliyor. OculusDash ve
                 // bagli/aktif gozluk, PC VR oturumu icin daha guvenilir kanit.
                 // Touch kontrolculer Play oncesinde uyuyabilir ve runtime acikken
                 // yeniden baglanabilir; bu nedenle Play'i engellemezler.
+                string transport = headset.isUsingAirLink ? "Air Link" : "USB Link";
                 reason = controllersReady
-                    ? "Quest Air Link PC VR oturumu ve iki Touch kontrolcu hazir."
-                    : "Quest Air Link PC VR oturumu hazir; Touch kontrolculeri uyandir.";
+                    ? $"Quest {transport} PC VR oturumu ve iki Touch kontrolcu hazir."
+                    : $"Quest {transport} PC VR oturumu hazir; Touch kontrolculeri uyandir.";
                 return true;
             }
 
@@ -188,7 +191,7 @@ public static class AirLinkSafeXrBootstrap
             {
                 reason = headset == null
                     ? "Meta Horizon Link'te Quest gozluk bulunamadi."
-                    : "Quest Air Link baglantisi hazir degil " +
+                    : "Quest Link baglantisi hazir degil " +
                       $"(cihaz={headset.connectionState}, guc={headset.powerState}, " +
                       $"AirLink={headset.isUsingAirLink}).";
                 return false;
@@ -237,7 +240,7 @@ public static class AirLinkSafeXrBootstrap
 
 #if UNITY_STANDALONE_WIN
 /// <summary>
-/// Play gecisinde Link'in dusmedigini tekrar kontrol eder ve yalnizca basarili
+/// Play gecisinde USB/Air Link'in dusmedigini tekrar kontrol eder ve yalnizca basarili
 /// elle baslatmadan sonra XR'i guvenle kapatir.
 /// </summary>
 public sealed class AirLinkSafeXrStarter : MonoBehaviour
