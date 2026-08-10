@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: AlterunaConfig
   m_EditorClassIdentifier: Alteruna.Multiplayer.Unity.dll::Alteruna.Multiplayer.Unity.Configs.AlterunaConfig
   _simpleAttributes: 0
-  _transportType: 1
+  _transportType: 2
   _websocketSecure: 1
   _enableLOD: 1
   _allowMultiplayerSingleton: 1

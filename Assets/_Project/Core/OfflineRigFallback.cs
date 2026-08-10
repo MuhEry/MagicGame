@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Utilities;
@@ -23,6 +24,9 @@ public sealed class OfflineRigFallback : MonoBehaviour
 
     [Tooltip("Ilk XR karesi goruldukten sonra etkinlestirilecek Alteruna kok nesnesi.")]
     [SerializeField] GameObject networkRoot;
+
+    [Tooltip("Alteruna servis hazirligi bu sureyi asarsa ag kapali kalir; XR donmaz.")]
+    [SerializeField, Min(2f)] float networkStartupTimeout = 12f;
 
     [Tooltip("Bu kadar saniye aktif kamera bulunamazsa bekci devreye girer.")]
     [SerializeField, Min(0.5f)] float watchdogDelay = 12f;
@@ -57,11 +61,50 @@ public sealed class OfflineRigFallback : MonoBehaviour
         // En az bir yerel XR karesi cizilsin; Alteruna bundan sonra baslasin.
         yield return null;
 
-        if (networkRoot != null && !networkRoot.activeSelf)
+        if (networkRoot == null || networkRoot.activeSelf)
+            yield break;
+
+        AlterunaComponents.MultiplayerManager manager =
+            networkRoot.GetComponentInChildren<AlterunaComponents.MultiplayerManager>(true);
+        if (manager == null)
         {
-            networkRoot.SetActive(true);
-            Debug.Log("[Multiplayer] Ilk XR karesi hazir; Alteruna kok nesnesi etkinlestirildi.", this);
+            Debug.LogError(
+                "[Multiplayer] Alteruna kok nesnesinde MultiplayerManager bulunamadi; " +
+                "ag baslatilmadi ve XR cevrimdisi calismaya devam edecek.", this);
+            yield break;
         }
+
+        Debug.Log(
+            "[Multiplayer] Ilk XR karesi hazir. Alteruna servis cekirdegi worker thread'de hazirlaniyor.",
+            this);
+
+        Task<AlterunaServicePrewarmer.Result> prewarm = AlterunaServicePrewarmer.Begin(manager);
+        float deadline = Time.realtimeSinceStartup + Mathf.Max(2f, networkStartupTimeout);
+        while (!prewarm.IsCompleted && Time.realtimeSinceStartup < deadline)
+            yield return null;
+
+        if (!prewarm.IsCompleted)
+        {
+            Debug.LogError(
+                $"[Multiplayer] Alteruna servis hazirligi {networkStartupTimeout:0} saniyeyi asti. " +
+                "Ana thread korunarak ag devre disi birakildi; XR donmayacak.", this);
+            yield break;
+        }
+
+        AlterunaServicePrewarmer.Result result = prewarm.Result;
+        if (!result.Success)
+        {
+            Debug.LogException(result.Error, this);
+            Debug.LogError(
+                "[Multiplayer] Alteruna servis hazirligi basarisiz; " +
+                "ag devre disi birakildi ve XR cevrimdisi calismaya devam edecek.", this);
+            yield break;
+        }
+
+        networkRoot.SetActive(true);
+        Debug.Log(
+            "[Multiplayer] Alteruna servis cekirdegi hazir; ag nesneleri ana thread'de etkinlestirildi.",
+            this);
     }
 
     void Update()

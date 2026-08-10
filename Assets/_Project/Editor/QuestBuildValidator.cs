@@ -18,11 +18,15 @@ using UnityEngine.XR.OpenXR.Features;
 public sealed class QuestBuildValidator : IPreprocessBuildWithReport
 {
     const string MainScenePath = "Assets/_Project/Scenes/Main.unity";
+    const string EmptyTestScenePath = "Assets/_Project/Scenes/EmptyNetworkTest.unity";
     const string ApplicationDataPath = "Assets/Alteruna/Resources/ApplicationData.asset";
     const string AlterunaConfigPath = "Assets/Resources/AlterunaConfig.asset";
     const string OpenXrSettingsPath = "Assets/XR/Settings/OpenXRPackageSettings.asset";
     const string OpenXrSettingsKey = "com.unity.xr.openxr.settings4";
     const string ProjectSettingsPath = "ProjectSettings/ProjectSettings.asset";
+    const string XrSimulationPreferencesPath = "Assets/XR/UserSimulationSettings/Resources/XRSimulationPreferences.asset";
+    const string XrSimulationRuntimeSettingsPath = "Assets/XR/Resources/XRSimulationRuntimeSettings.asset";
+    const string XrSimulationTempFolder = "Assets/XR/Temp";
     const string ControllerRigPrefabGuid = "f6336ac4ac8b4d34bc5072418cdc62a0";
     const string LegacyHandsRigPrefabGuid = "d6878e1999eb4b44a9f5a263af86c185";
 
@@ -52,6 +56,8 @@ public sealed class QuestBuildValidator : IPreprocessBuildWithReport
     {
         if (report.summary.platform != BuildTarget.Android)
             return;
+
+        RepairStaleXrSimulationAssets();
 
         List<string> errors = ValidateProject();
         if (errors.Count > 0)
@@ -83,9 +89,9 @@ public sealed class QuestBuildValidator : IPreprocessBuildWithReport
 
         ValidateApplicationId(errors);
         ValidateAlterunaTransport(errors);
-        ValidateBuildScenes(errors);
+        string buildScenePath = ValidateBuildScenes(errors);
         ValidatePlayerSettings(errors);
-        ValidateScene(errors);
+        ValidateScene(buildScenePath, errors);
         ValidateOpenXrSettings(errors);
         ValidateUniqueMetaQuestFeature(errors);
 
@@ -120,26 +126,35 @@ public sealed class QuestBuildValidator : IPreprocessBuildWithReport
         }
 
         SerializedProperty transport = new SerializedObject(config).FindProperty("_transportType");
-        if (transport == null || transport.intValue != 1)
-            errors.Add("Alteruna transport ayari Default (UDP) olmali; portal Transport Mode ile ayni tutulmali.");
+        if (transport == null || transport.intValue != 2)
+            errors.Add("Quest'te UDP ana thread'i kilitledigi icin Alteruna transport TCP olmali; portal Transport Mode da TCP olmali.");
 
         SerializedProperty lanDiscovery = new SerializedObject(config).FindProperty("_enableLanDiscovery");
         if (lanDiscovery == null || lanDiscovery.boolValue)
             errors.Add("Internet matchmaking build'inde LAN Discovery kapali olmali.");
     }
 
-    static void ValidateBuildScenes(List<string> errors)
+    static string ValidateBuildScenes(List<string> errors)
     {
         string[] enabledScenes = EditorBuildSettings.scenes
             .Where(scene => scene.enabled)
             .Select(scene => scene.path)
             .ToArray();
 
-        if (enabledScenes.Length != 1 ||
-            !string.Equals(enabledScenes[0], MainScenePath, StringComparison.OrdinalIgnoreCase))
+        if (enabledScenes.Length != 1)
         {
-            errors.Add("Build Scene List yalnizca Main sahnesini icermeli.");
+            errors.Add("Build Scene List yalnizca tek bir sahne icermeli.");
+            return MainScenePath;
         }
+
+        string path = enabledScenes[0];
+        if (!string.Equals(path, MainScenePath, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(path, EmptyTestScenePath, StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("Build sahnesi Main veya EmptyNetworkTest olmali.");
+        }
+
+        return path;
     }
 
     static void ValidatePlayerSettings(List<string> errors)
@@ -153,20 +168,53 @@ public sealed class QuestBuildValidator : IPreprocessBuildWithReport
         string projectSettings = File.ReadAllText(ProjectSettingsPath);
         if (!projectSettings.Contains("activeInputHandler: 1"))
             errors.Add("Android Active Input Handling yalnizca Input System Package olmali.");
-        if (!Regex.IsMatch(projectSettings,
-                @"managedStrippingLevel:\s*\r?\n\s+Android: 0"))
+        if (PlayerSettings.GetManagedStrippingLevel(NamedBuildTarget.Android) !=
+            ManagedStrippingLevel.Minimal)
             errors.Add("Android Managed Stripping Level, RPC/reflection guvenligi icin Minimal olmali.");
     }
 
-    static void ValidateScene(List<string> errors)
+    static void RepairStaleXrSimulationAssets()
     {
-        if (!File.Exists(MainScenePath))
+        bool changed = false;
+        changed |= RepairStaleXrSimulationAsset(XrSimulationPreferencesPath);
+        changed |= RepairStaleXrSimulationAsset(XrSimulationRuntimeSettingsPath);
+
+        if (changed)
         {
-            errors.Add($"Main sahnesi bulunamadi: {MainScenePath}");
+            AssetDatabase.Refresh();
+            Debug.Log("[Quest Build] Onceki yarim build'den kalan XR Simulation gecici dosyalari onarildi.");
+        }
+    }
+
+    static bool RepairStaleXrSimulationAsset(string sourcePath)
+    {
+        string tempPath = XrSimulationTempFolder + "/" + Path.GetFileName(sourcePath);
+        bool sourceExists = File.Exists(sourcePath);
+        bool tempExists = File.Exists(tempPath);
+
+        if (!tempExists)
+            return false;
+
+        if (sourceExists)
+            return AssetDatabase.DeleteAsset(tempPath);
+
+        string error = AssetDatabase.MoveAsset(tempPath, sourcePath);
+        if (!string.IsNullOrEmpty(error))
+            throw new BuildFailedException(
+                $"XR Simulation ayari gecici klasorden geri alinamadi: {tempPath} -> {sourcePath}. {error}");
+
+        return true;
+    }
+
+    static void ValidateScene(string scenePath, List<string> errors)
+    {
+        if (!File.Exists(scenePath))
+        {
+            errors.Add($"Build sahnesi bulunamadi: {scenePath}");
             return;
         }
 
-        string scene = File.ReadAllText(MainScenePath);
+        string scene = File.ReadAllText(scenePath);
         if (!scene.Contains("ConnectOnStart: 0"))
             errors.Add("MultiplayerManager ConnectOnStart kapali olmali; AutoJoin ilk kareden sonra baglanir.");
         if (!Regex.IsMatch(scene,
