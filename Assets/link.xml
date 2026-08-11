@@ -1,0 +1,23 @@
+<!--
+  IL2CPP kod kirpma (managed stripping) korumasi.
+
+  NEDEN VAR: Alteruna'nin [SynchronizableMethod] RPC'leri YANSIMA (reflection) ile
+  bulunur. IL2CPP + ARM64 derlemesinde kirpici bu metotlara hicbir cagri goremez ve
+  onlari SESSIZCE siler. Sonuc, hata ayiklamasi en zor tablodur:
+
+      editorde her sey calisir, gozlukte hicbir sey senkron olmaz.
+
+  Hicbir istisna, hicbir log satiri olusmaz - RPC'ler yok olmustur.
+
+  Bu dosya kirpiciya "bu derlemelerdeki her seyi koru" der. Alternatifi
+  Player Settings > Managed Stripping Level = Low'dur; ikisi ayni isi yapar,
+  ama bu dosya repoda durur ve ayar unutulsa bile korumaya devam eder.
+
+  Assembly-CSharp: bizim NetworkShiftCoordinator ve ItemOwnership RPC'lerimiz burada.
+-->
+<linker>
+  <assembly fullname="Assembly-CSharp" preserve="all" />
+  <assembly fullname="Alteruna.Multiplayer" preserve="all" />
+  <assembly fullname="Alteruna.Multiplayer.Unity" preserve="all" />
+  <assembly fullname="com.alteruna.multiplayer" preserve="all" />
+</linker>

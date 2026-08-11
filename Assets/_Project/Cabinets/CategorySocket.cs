@@ -92,9 +92,23 @@ public class CategorySocket : XRSocketInteractor
     }
 
     /// <inheritdoc />
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+
+        // FAZ 2: dogru esyanin tuketilmesi her cihazda AYRI AYRI, yerel soket
+        // olayindan tetikleniyor. Fizik iki gozlukte birebir ayni olmadigi icin
+        // esya birinde kaybolup digerinde tezgahta kalabilir. Host karari
+        // yayinladiginda bu olay eksik kalan istemcide de ayni temizligi yapar.
+        NetworkShiftCoordinator.ItemConsumed += HandleNetworkItemConsumed;
+    }
+
+    /// <inheritdoc />
     protected override void OnDisable()
     {
         base.OnDisable();
+
+        NetworkShiftCoordinator.ItemConsumed -= HandleNetworkItemConsumed;
 
         // Soket devre disi kalirsa coroutine'ler oldurulur ama bayraklar kalir.
         // Sifirlanmazsa dolap tekrar acildiginda kilitli kalir ve hicbir esya kabul etmez.
@@ -102,6 +116,27 @@ public class CategorySocket : XRSocketInteractor
         m_Accepting = false;
         m_RejectRoutine = null;
         m_AcceptRoutine = null;
+    }
+
+    /// <summary>
+    /// Host "su esya tuketildi" dedi. Esya bu dolabin kategorisine aitse ve hala
+    /// ortalikta duruyorsa kaldirir. Zaten kaldirilmissa hicbir sey yapmaz
+    /// (idempotent) - host kendi yayinini ikinci kez islemesin diye.
+    /// </summary>
+    void HandleNetworkItemConsumed(int itemId)
+    {
+        foreach (var identity in FindObjectsByType<ItemIdentity>(FindObjectsSortMode.None))
+        {
+            if (identity == null || identity.ItemData == null || identity.ItemId != itemId)
+                continue;
+
+            // Esya bu dolabin isi degilse dokunma; dogru kategorinin soketi halleder.
+            if (identity.ItemData.category != m_AcceptedCategory)
+                return;
+
+            Destroy(identity.gameObject);
+            return;
+        }
     }
 
     /// <inheritdoc />
@@ -290,6 +325,9 @@ public class CategorySocket : XRSocketInteractor
 
         var itemTransform = interactable?.transform;
 
+        // Kimligi esya yok edilmeden ONCE oku; sonra okumaya calisirsak null olur.
+        TryResolveItem(interactable, out var consumedItemId, out _, out _);
+
         if (m_AcceptDelay > 0f)
             yield return new WaitForSeconds(m_AcceptDelay);
 
@@ -305,10 +343,12 @@ public class CategorySocket : XRSocketInteractor
 
         yield return null;
 
-        // TODO(Faz 2): Agda Destroy dogrudan kullanilamaz; nesne yasam dongusu
-        //              ItemSpawner uzerinden despawn edilmeli (mimari kural 3).
         if (itemTransform != null)
             Destroy(itemTransform.gameObject);
+
+        // Ayni tuketimi diger gozlukte de garanti et. Cevrimdisi oyunda ve
+        // istemcide bu cagri sessizce hicbir sey yapmaz (yalnizca host yayinlar).
+        NetworkShiftCoordinator.Instance?.BroadcastItemConsumed(consumedItemId);
 
         m_Accepting = false;
         m_AcceptRoutine = null;

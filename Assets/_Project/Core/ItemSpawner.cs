@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Alteruna.Multiplayer.Unity;
 using UnityEngine;
 
 [Serializable]
@@ -26,6 +27,11 @@ public class ItemSpawner : MonoBehaviour
 
     [Header("Sahne")]
     [SerializeField] private Transform spawnPoint;
+
+    [Header("Faz 2")]
+    [Tooltip("Alteruna Spawner. Bos ise oyun cevrimdisi calisir; ODADAYKEN zorunludur.\n" +
+             "Tools > Gece Vardiyasi > Faz 2 Kurulumunu Uygula bunu baglar.")]
+    [SerializeField] private Spawner networkSpawner;
 
     private readonly List<ItemSpawnEntry> spawnQueue = new List<ItemSpawnEntry>();
     private System.Random random;
@@ -105,16 +111,65 @@ public class ItemSpawner : MonoBehaviour
             return null;
         }
 
+        NetworkShiftCoordinator network = NetworkShiftCoordinator.Instance;
+        bool inNetworkedRoom = network != null && network.IsInRoom;
+
+        // Odadayken esyayi yalnizca host uretir; istemciye Alteruna kopyasini getirir.
+        // Kuyruk indeksini de TUKETMEDEN cikiyoruz ki host degisirse sira kaymasin.
+        if (inNetworkedRoom && !network.IsHost)
+            return null;
+
         ItemSpawnEntry entry = spawnQueue[nextQueueIndex++];
         Transform point = spawnPoint != null ? spawnPoint : transform;
 
-        // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
-        CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+        if (inNetworkedRoom)
+        {
+            CurrentSpawnedItem = SpawnOverNetwork(entry, point);
+        }
+        else
+        {
+            // Projedeki yerel Instantiate çağrısı yalnızca bu dosyada tutulur (mimari kural 3).
+            CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+        }
+
+        if (CurrentSpawnedItem == null)
+            return null;
+
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
         ItemSpawned?.Invoke(CurrentSpawnedItem);
 
         return CurrentSpawnedItem;
+    }
+
+    /// <summary>
+    /// Alteruna Spawner uzerinden uretim. Basarisiz olursa SESSIZCE yerel
+    /// Instantiate'e DUSMEZ: o durumda host esyayi gorur, istemci bos tezgaha
+    /// bakar ve kimse sebebini anlamaz. Gorunmez desenkronizasyon yerine gorunur hata.
+    /// </summary>
+    private GameObject SpawnOverNetwork(ItemSpawnEntry entry, Transform point)
+    {
+        if (networkSpawner == null)
+        {
+            Debug.LogError(
+                "[ItemSpawner] Odadayiz ama Alteruna Spawner atanmamis; esya uretilmedi.\n" +
+                "Tools > Gece Vardiyasi > Faz 2 Kurulumunu Uygula komutunu calistir.", this);
+            return null;
+        }
+
+        // Indeks Alteruna'nin KENDI listesine gore cozulmeli. itemPrefabs.IndexOf
+        // kullanilirsa ve iki liste ayni sirada degilse host bir esyayi, istemci
+        // bambaska bir esyayi gorur.
+        int prefabIndex = networkSpawner.SpawnableObjects.IndexOf(entry.prefab);
+        if (prefabIndex < 0)
+        {
+            Debug.LogError(
+                $"[ItemSpawner] '{entry.prefab.name}' Alteruna Spawner.SpawnableObjects listesinde yok; " +
+                "esya uretilmedi. Faz 2 kurulum komutunu tekrar calistir.", this);
+            return null;
+        }
+
+        return networkSpawner.Spawn(prefabIndex, point.position, point.rotation);
     }
 
     public void StopSpawning()

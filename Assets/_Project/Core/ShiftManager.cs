@@ -37,6 +37,9 @@ public class ShiftManager : MonoBehaviour
     [SerializeField, Min(0f)] private float nextItemDelaySeconds = 0.5f;
     [SerializeField] private ItemSpawner itemSpawner;
 
+    [Tooltip("Faz 2 koprusu. Bos birakilirsa sahnede aranir; hic yoksa oyun cevrimdisi calisir.")]
+    [SerializeField] private NetworkShiftCoordinator networkCoordinator;
+
     private readonly Dictionary<ItemCategory, int> incorrectByCategory =
         new Dictionary<ItemCategory, int>();
 
@@ -73,6 +76,9 @@ public class ShiftManager : MonoBehaviour
 
         if (itemSpawner == null)
             itemSpawner = FindFirstObjectByType<ItemSpawner>();
+
+        if (networkCoordinator == null)
+            networkCoordinator = FindFirstObjectByType<NetworkShiftCoordinator>();
     }
 
     private void OnDestroy()
@@ -88,9 +94,62 @@ public class ShiftManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Faz 2 koprusunu tembel cozer. Sahnede koordinator yoksa null doner ve
+    /// butun ag dallari atlanir - yani Faz 1 akisi aynen calisir.
+    /// </summary>
+    private NetworkShiftCoordinator ResolveCoordinator()
+    {
+        if (networkCoordinator == null)
+            networkCoordinator = NetworkShiftCoordinator.Instance;
+
+        return networkCoordinator;
+    }
+
+    /// <summary>Odadayiz ve host DEGILIZ: saat, spawn ve skor host'tan gelir.</summary>
+    private bool IsNetworkClient
+    {
+        get
+        {
+            NetworkShiftCoordinator coordinator = ResolveCoordinator();
+            return coordinator != null && coordinator.IsInRoom && !coordinator.IsHost;
+        }
+    }
+
+    /// <summary>
     /// UI'daki "Yeni Vardiya" butonunun çağıracağı metot.
+    ///
+    /// Odadaysak vardiyayi HOST baslatir (iki cihazda iki farkli seed olmasin diye).
+    /// Odada degilsek dogrudan cevrimdisi yol calisir - Faz 1 davranisi.
     /// </summary>
     public void StartShift()
+    {
+        NetworkShiftCoordinator coordinator = ResolveCoordinator();
+
+        if (coordinator != null && coordinator.IsInRoom)
+        {
+            coordinator.RequestStartShift();
+            return;
+        }
+
+        StartShiftOffline();
+    }
+
+    /// <summary>Tek oyuncu / oda disi vardiya. Faz 1'deki eski StartShift davranisi.</summary>
+    public void StartShiftOffline()
+    {
+        StartShiftInternal(null, true);
+    }
+
+    /// <summary>
+    /// Host'un yayinladigi vardiya. <paramref name="runAuthoritativeTimer"/> yalnizca
+    /// host'ta true'dur; istemci saati ve esya uretimini host'tan alir.
+    /// </summary>
+    public void StartShiftFromNetwork(int synchronizedSeed, bool runAuthoritativeTimer)
+    {
+        StartShiftInternal(synchronizedSeed, runAuthoritativeTimer);
+    }
+
+    private void StartShiftInternal(int? synchronizedSeed, bool runAuthoritativeTimer)
     {
         if (State == ShiftState.Vardiya)
         {
@@ -123,17 +182,52 @@ public class ShiftManager : MonoBehaviour
         }
         else
         {
+            // Mimari kural 4: ayni seed -> iki istemcide ayni esya sirasi.
+            if (synchronizedSeed.HasValue)
+                itemSpawner.SetSeed(synchronizedSeed.Value);
+
             itemSpawner.BeginShift();
-            itemSpawner.SpawnNext();
+
+            // Esyayi yalnizca otorite uretir; istemcide Alteruna Spawner kopyasini getirir.
+            if (runAuthoritativeTimer)
+                itemSpawner.SpawnNext();
         }
 
-        timerRoutine = StartCoroutine(RunShiftTimer());
+        // Istemci kendi saatini isletmez, host'un ApplyClock yayinini uygular.
+        if (runAuthoritativeTimer)
+            timerRoutine = StartCoroutine(RunShiftTimer());
     }
 
     /// <summary>
     /// B'nin CategorySocket sistemi oyuncu bir eşyayı dolaba bıraktığında bu metodu çağırır.
+    ///
+    /// Mimari kural 2: TUM durum degisikligi bu tek metottan gecer. Odadayken
+    /// karar host'a gonderilir, skoru host tutar; sonucu herkes ApplyDecisionFromNetwork
+    /// ile ayni sirayla uygular. Odada degilsek dogrudan uygulanir (Faz 1).
     /// </summary>
     public void RegisterDecision(
+        int itemId,
+        ItemCategory correct,
+        ItemCategory chosen,
+        float inspectMs,
+        int shakeCount)
+    {
+        NetworkShiftCoordinator coordinator = ResolveCoordinator();
+
+        if (coordinator != null && coordinator.IsInRoom)
+        {
+            coordinator.SubmitDecision(itemId, correct, chosen, inspectMs, shakeCount);
+            return;
+        }
+
+        ApplyDecisionFromNetwork(itemId, correct, chosen, inspectMs, shakeCount);
+    }
+
+    /// <summary>
+    /// Karari FIILEN uygulayan metot. Cevrimdisi oyunda RegisterDecision dogrudan
+    /// buraya duser; odadayken yalnizca host'un onayladigi karar buraya gelir.
+    /// </summary>
+    public void ApplyDecisionFromNetwork(
         int itemId,
         ItemCategory correct,
         ItemCategory chosen,
@@ -180,8 +274,36 @@ public class ShiftManager : MonoBehaviour
 
     /// <summary>
     /// Vardiyayı dışarıdan erken bitirmek gerekirse kullanılabilir.
+    /// Odadayken bitirme karari host'undur; istemci bekler.
     /// </summary>
     public void EndShift()
+    {
+        if (IsNetworkClient)
+            return;
+
+        CompleteShift();
+    }
+
+    /// <summary>Host "vardiya bitti" dedi; istemci raporu ayni anda acar.</summary>
+    public void EndShiftFromNetwork()
+    {
+        CompleteShift();
+    }
+
+    /// <summary>
+    /// Host'un yayinladigi kalan sure. Istemci kendi saatini isletmedigi icin
+    /// HUD yalnizca bu degerle guncellenir.
+    /// </summary>
+    public void ApplyNetworkClock(float synchronizedRemainingSeconds)
+    {
+        if (State != ShiftState.Vardiya)
+            return;
+
+        remainingSeconds = Mathf.Clamp(synchronizedRemainingSeconds, 0f, shiftDurationSeconds);
+        PublishTime();
+    }
+
+    private void CompleteShift()
     {
         if (State != ShiftState.Vardiya)
             return;
@@ -223,6 +345,11 @@ public class ShiftManager : MonoBehaviour
     private void QueueNextItem()
     {
         if (itemSpawner == null || State != ShiftState.Vardiya)
+            return;
+
+        // Sonraki esyayi yalnizca otorite uretir. Istemci de uretirse tezgahta
+        // iki esya olur ve iki cihaz farkli seyler gorur.
+        if (IsNetworkClient)
             return;
 
         if (nextItemRoutine != null)
