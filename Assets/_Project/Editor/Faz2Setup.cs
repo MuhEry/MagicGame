@@ -143,6 +143,8 @@ static class Faz2Setup
         if (!PlayerSettings.Android.forceInternetPermission)
             log.AppendLine("            -> Tools > Gece Vardiyasi > Android Ag Iznini Zorunlu Yap");
 
+        problems += CheckXrInput(log);
+
         // Rig'in altinda global namespace'li kendi scriptlerimiz olmamali:
         // Alteruna'nin avatar temizligi type.Namespace.Length okur ve NULL'da patlar.
         problems += CheckNoOwnScriptsUnderRig(log);
@@ -183,6 +185,72 @@ static class Faz2Setup
 
         Debug.Log("[Faz 2] Android Internet Access = Require yapildi.\n" +
                   "ProjectSettings/ProjectSettings.asset degisti - commit etmeyi unutma.");
+    }
+
+    /// <summary>
+    /// El takibini kapatir, yalnizca kontrolcu birakir.
+    ///
+    /// NEDEN KONTROLCU: sartnamedeki uc yoklama kanalindan biri HAPTIKTIR
+    /// ("Agirlik: tutulurken her karede dusuk genlikli surekli haptik gonder").
+    /// El takibinde haptik YOKTUR - agir esya sinyali hic verilemez. Yani bu oyun
+    /// kontrolcu ile oynanmak zorundadir; el takibi acik kalirsa oyuncu yanlislikla
+    /// el moduna gecip oyunun ucte birini kaybeder.
+    ///
+    /// Kontrolcu profilini (OculusTouchControllerProfile) KAPATMIYORUZ - kapaliysa
+    /// OpenXR kontrolcu girdilerini hicbir action'a baglamaz ve gozlukte
+    /// hicbir sey algilanmaz.
+    /// </summary>
+    [MenuItem("Tools/Gece Vardiyasi/El Takibini Kapat (yalnizca kontrolcu)", false, 51)]
+    static void DisableHandTracking()
+    {
+        var targets = new[] { BuildTargetGroup.Standalone, BuildTargetGroup.Android };
+        var log = new StringBuilder();
+
+        foreach (BuildTargetGroup target in targets)
+        {
+            UnityEngine.XR.OpenXR.OpenXRSettings settings =
+                UnityEngine.XR.OpenXR.OpenXRSettings.GetSettingsForBuildTargetGroup(target);
+
+            if (settings == null)
+            {
+                log.AppendLine($"  {target}: OpenXR ayari yok, atlandi.");
+                continue;
+            }
+
+            foreach (UnityEngine.XR.OpenXR.Features.OpenXRFeature feature in settings.GetFeatures())
+            {
+                if (feature == null)
+                    continue;
+
+                // TAM ad esleseni kapat. "HandTracking" alt dizesiyle eslesirsek
+                // MetaHandTrackingAim gibi etkilesim profillerini de kapatiriz.
+                if (feature.GetType().Name == "HandTracking" && feature.enabled)
+                {
+                    feature.enabled = false;
+                    EditorUtility.SetDirty(feature);
+                    log.AppendLine($"  {target}: HandTracking KAPATILDI.");
+                }
+
+                // Kontrolcu profili kapaliysa gozlukte hicbir girdi calismaz.
+                if (feature.GetType().Name == "OculusTouchControllerProfile" && !feature.enabled)
+                {
+                    feature.enabled = true;
+                    EditorUtility.SetDirty(feature);
+                    log.AppendLine($"  {target}: OculusTouchControllerProfile ACILDI (kontrolcu icin sart).");
+                }
+            }
+
+            UnityEditor.XR.OpenXR.Features.FeatureHelpers.RefreshFeatures(target);
+        }
+
+        AssetDatabase.SaveAssets();
+
+        if (log.Length == 0)
+            log.AppendLine("  Degisiklik gerekmedi; el takibi zaten kapali, kontrolcu profili acik.");
+
+        Debug.Log("[Faz 2] El takibi ayarlari:\n" + log +
+                  "\nArtik 'Hand Tracking Subsystem not found' uyarisi cikmayacak.\n" +
+                  "Assets/XR/Settings/OpenXRPackageSettings.asset degisti - commit etmeyi unutma.");
     }
 
     [MenuItem("Tools/Gece Vardiyasi/Editorde XR Baslatmayi Kapat (Standalone)", false, 60)]
@@ -554,6 +622,48 @@ static class Faz2Setup
         // Bu dosya repoya girmezse takimin geri kalaninda LAN kesfi kapali gelir.
         log.AppendLine("  [BILGI] " + path + " commit edilmeli - yoksa ekipteki digerlerinde " +
                        "bu ayarlarin hicbiri olmaz.");
+
+        return problems;
+    }
+
+    /// <summary>
+    /// Bu oyun KONTROLCU ile oynanir (haptik kanali el takibinde yoktur).
+    /// Kontrolcu profili kapaliysa OpenXR hicbir girdiyi baglamaz; el takibi acik
+    /// kalirsa oyuncu yanlislikla el moduna gecebilir.
+    /// </summary>
+    static int CheckXrInput(StringBuilder log)
+    {
+        int problems = 0;
+
+        foreach (BuildTargetGroup target in new[] { BuildTargetGroup.Standalone, BuildTargetGroup.Android })
+        {
+            UnityEngine.XR.OpenXR.OpenXRSettings settings =
+                UnityEngine.XR.OpenXR.OpenXRSettings.GetSettingsForBuildTargetGroup(target);
+
+            if (settings == null)
+                continue;
+
+            bool handTrackingOn = false;
+            bool controllerProfileOn = false;
+
+            foreach (UnityEngine.XR.OpenXR.Features.OpenXRFeature feature in settings.GetFeatures())
+            {
+                if (feature == null)
+                    continue;
+
+                string typeName = feature.GetType().Name;
+                if (typeName == "HandTracking")
+                    handTrackingOn = feature.enabled;
+                else if (typeName == "OculusTouchControllerProfile")
+                    controllerProfileOn = feature.enabled;
+            }
+
+            problems += Report(log, controllerProfileOn, $"{target}: Oculus Touch Controller Profile ACIK");
+            problems += Report(log, !handTrackingOn, $"{target}: Hand Tracking KAPALI (oyun kontrolcu ile oynanir)");
+        }
+
+        if (problems > 0)
+            log.AppendLine("            -> Tools > Gece Vardiyasi > El Takibini Kapat (yalnizca kontrolcu)");
 
         return problems;
     }
