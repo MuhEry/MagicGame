@@ -157,13 +157,23 @@ public sealed class NetworkShiftCoordinator : AttributesSync
         if (!IsMultiplayerUsable("oda acilamiyor"))
             return;
 
-        // RoomMenu ile ayni akis: servis zaten ayaktaysa yalnizca oda kur.
-        if (Multiplayer.IsConnected)
-            Multiplayer.CreateRoom();
-        else
-            Multiplayer.Host();
+        // ================== Multiplayer.Host() KULLANMIYORUZ ==================
+        // Host() icinde Service.ClosePort() cagrisi var ve ClosePort ana is
+        // parcaciginda Task.Wait() calistiriyor. O task tamamlanmazsa Unity
+        // TAMAMEN DONAR: log susar, crash dump olusmaz, hicbir istisna cikmaz.
+        // SDK'da Task.Wait() yapan TEK yol budur (IL ile tarandi).
+        //
+        // Ayni sonucu bloklamadan aliyoruz:
+        //   Connect()    -> servisi ayaga kaldirir + portu acar (ClosePort YOK)
+        //   CreateRoom() -> odayi kurar (ClosePort YOK)
+        if (!Multiplayer.IsConnected)
+        {
+            Multiplayer.Connect();
+            Debug.Log("[Network] Servis ayaga kaldirildi (Host() bilerek atlandi).", this);
+        }
 
-        Debug.Log("[Network] Host istegi gonderildi (LAN).", this);
+        Multiplayer.CreateRoom();
+        Debug.Log("[Network] Oda kuruldu (LAN).", this);
     }
 
     /// <summary>

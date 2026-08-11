@@ -154,6 +154,7 @@ static class Faz2Setup
 
         problems += CheckXrInput(log);
         problems += CheckEditorXrStartup(log);
+        problems += CheckNoHangingRoomMenu(log);
 
         // Rig'in altinda global namespace'li kendi scriptlerimiz olmamali:
         // Alteruna'nin avatar temizligi type.Namespace.Length okur ve NULL'da patlar.
@@ -181,6 +182,69 @@ static class Faz2Setup
     /// olmadigini kendi tahmin eder. Alteruna'nin baglantisi bu tahmine takilabilir;
     /// sonuc klasik tablodur: editorde calisir, gozlukte hic baglanmaz.
     /// </summary>
+    /// <summary>
+    /// Alteruna'nin hazir "Room Menu" / "Room Browser" UI'sini sahnede KAPATIR.
+    ///
+    /// NEDEN: o menunun Start butonu `MultiplayerManager.Host()` cagirir. Host()
+    /// icinde `Service.ClosePort()` var ve ClosePort ana is parcaciginda
+    /// `Task.Wait()` calistirir. O task tamamlanmazsa UNITY TAMAMEN DONAR -
+    /// log susar, crash dump olusmaz, tek satir istisna cikmaz. SDK'da
+    /// Task.Wait() yapan tek yol budur.
+    ///
+    /// Kendi HostLanSession() metodumuz Host()'u atlayip Start() + CreateRoom()
+    /// kullanir; bloklamaz. Butonlari ona baglayin.
+    /// </summary>
+    [MenuItem("Tools/Gece Vardiyasi/Alteruna Hazir Menusunu Kapat (donma tuzagi)", false, 43)]
+    static void DisableAlterunaSampleMenus()
+    {
+        int disabled = 0;
+        var log = new StringBuilder();
+
+        foreach (MonoBehaviour behaviour in Object.FindObjectsByType<MonoBehaviour>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (behaviour == null || !IsAlterunaSampleMenu(behaviour))
+                continue;
+
+            if (!behaviour.gameObject.activeSelf)
+                continue;
+
+            Undo.RecordObject(behaviour.gameObject, "Alteruna menusunu kapat");
+            behaviour.gameObject.SetActive(false);
+            EditorUtility.SetDirty(behaviour.gameObject);
+
+            log.AppendLine($"  KAPATILDI: '{behaviour.gameObject.name}' ({behaviour.GetType().Name})");
+            disabled++;
+        }
+
+        if (disabled == 0)
+        {
+            Debug.Log("[Faz 2] Sahnede acik Alteruna hazir menusu yok - temiz.");
+            return;
+        }
+
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+        Debug.LogWarning("[Faz 2] Donma tuzagi kaldirildi:\n" + log +
+                         "\nO menunun Start butonu Host() cagiriyordu; Host() icindeki " +
+                         "Task.Wait() Unity'yi donduruyor.\n" +
+                         "Kendi butonunuzu NetworkShiftCoordinator.HostLanSession() metoduna baglayin.\n" +
+                         "Sahne KAYDEDILMEDI - Ctrl+S ile kendin kaydet.");
+    }
+
+    /// <summary>
+    /// Tip ADINA bakiyoruz; SDK'nin ic tiplerine derleme bagimliligi kurmuyoruz.
+    /// </summary>
+    static bool IsAlterunaSampleMenu(MonoBehaviour behaviour)
+    {
+        string ns = behaviour.GetType().Namespace;
+        if (ns == null || !ns.StartsWith("Alteruna", System.StringComparison.Ordinal))
+            return false;
+
+        string name = behaviour.GetType().Name;
+        return name == "RoomMenu" || name == "RoomBrowser" ||
+               name == "BaseRoomBrowser" || name == "MatchmakingMenu";
+    }
+
     [MenuItem("Tools/Gece Vardiyasi/Android Ag Iznini Zorunlu Yap", false, 50)]
     static void ForceAndroidInternetPermission()
     {
@@ -670,6 +734,27 @@ static class Faz2Setup
                        "bu ayarlarin hicbiri olmaz.");
 
         return problems;
+    }
+
+    /// <summary>
+    /// Sahnede Alteruna'nin hazir menusu ACIK duruyorsa bu bir DONMA TUZAGIDIR:
+    /// Start butonu Host() cagirir, Host() icindeki Task.Wait() Unity'yi kilitler.
+    /// </summary>
+    static int CheckNoHangingRoomMenu(StringBuilder log)
+    {
+        foreach (MonoBehaviour behaviour in Object.FindObjectsByType<MonoBehaviour>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (behaviour == null || !IsAlterunaSampleMenu(behaviour) || !behaviour.gameObject.activeSelf)
+                continue;
+
+            log.AppendLine($"  [EKSIK] Sahnede ACIK Alteruna menusu var: '{behaviour.gameObject.name}' " +
+                           $"({behaviour.GetType().Name}) - Start butonu Host() cagirir ve UNITY DONAR.");
+            log.AppendLine("            -> Tools > Gece Vardiyasi > Alteruna Hazir Menusunu Kapat (donma tuzagi)");
+            return 1;
+        }
+
+        return Report(log, true, "Sahnede donduran Alteruna menusu yok");
     }
 
     /// <summary>
