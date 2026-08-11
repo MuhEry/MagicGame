@@ -1,33 +1,36 @@
+using AlterunaComponents;
 using UnityEngine;
 
 [RequireComponent(typeof(Alteruna.Multiplayer.Unity.Spawner))]
-public class NetworkTestSpawner : MonoBehaviour
+[RequireComponent(typeof(MultiplayerManager))]
+public sealed class NetworkTestSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject testPrefab;
     [SerializeField] private Transform spawnPoint;
 
     private Alteruna.Multiplayer.Unity.Spawner spawner;
-    private AlterunaComponents.MultiplayerManager multiplayerManager;
+    private MultiplayerManager multiplayerManager;
     private bool hasSpawned;
 
     private void Awake()
     {
         spawner = GetComponent<Alteruna.Multiplayer.Unity.Spawner>();
-        multiplayerManager = GetComponent<AlterunaComponents.MultiplayerManager>();
+        multiplayerManager = GetComponent<MultiplayerManager>();
     }
 
     private void Start()
     {
         if (testPrefab == null)
         {
-            Debug.LogError("[NetTestSpawn] Test Prefab atanmadı.", this);
+            Debug.LogError("[NetTestSpawn] Test prefab atanmadi.", this);
             return;
         }
 
         spawner.SpawnableObjects.Clear();
         spawner.SpawnableObjects.Add(testPrefab);
+        spawner.ForceSync = true;
 
-        Debug.Log("[NetTestSpawn] Spawner hazır. Listeye test prefabı eklendi.", this);
+        Debug.Log("[NetTestSpawn] Alteruna Spawner hazir; ForceSync acik.", this);
     }
 
     [ContextMenu("Debug/Spawn Test Object")]
@@ -35,24 +38,25 @@ public class NetworkTestSpawner : MonoBehaviour
     {
         if (!Application.isPlaying)
         {
-            Debug.LogWarning("[NetTestSpawn] Önce Play moduna gir.", this);
+            Debug.LogWarning("[NetTestSpawn] Once Play moduna gir.", this);
             return;
         }
 
-        if (multiplayerManager == null || !multiplayerManager.IsConnected)
+        if (multiplayerManager == null || !multiplayerManager.IsConnected || !multiplayerManager.InRoom)
         {
-            Debug.LogWarning("[NetTestSpawn] Sunucuya bağlı değilsin.", this);
+            Debug.LogWarning("[NetTestSpawn] Bir LAN odasina bagli degilsin.", this);
             return;
         }
 
-        // Geçici tanı testi: önce Alteruna Spawner'ın odaya yayılımını doğruluyoruz.
-        // Host yetkisi, ortak vardiya yöneticisi eklendiğinde yeniden zorunlu kılınacak.
-        if (!multiplayerManager.Me.IsHost)
-            Debug.LogWarning("[NetTestSpawn] Host olmayan istemciden test spawn isteği gönderiliyor.", this);
+        if (!multiplayerManager.IsHost())
+        {
+            Debug.LogWarning("[NetTestSpawn] Yalnizca host ag nesnesi uretebilir.", this);
+            return;
+        }
 
         if (hasSpawned)
         {
-            Debug.Log("[NetTestSpawn] Test nesnesi zaten üretildi.", this);
+            Debug.Log("[NetTestSpawn] Test nesnesi zaten uretildi.", this);
             return;
         }
 
@@ -60,6 +64,6 @@ public class NetworkTestSpawner : MonoBehaviour
         GameObject spawned = spawner.Spawn(0, point.position, point.rotation);
 
         hasSpawned = spawned != null;
-        Debug.Log($"[NetTestSpawn] Ağ nesnesi üretildi: {spawned?.name}", this);
+        Debug.Log($"[NetTestSpawn] Host ag nesnesi uretti: {spawned?.name}", this);
     }
 }

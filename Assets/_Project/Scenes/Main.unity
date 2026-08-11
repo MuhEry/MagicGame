@@ -643,7 +643,7 @@ GameObject:
   - component: {fileID: 377693454}
   - component: {fileID: 377693457}
   - component: {fileID: 377693456}
-  - component: {fileID: 377693458}
+  - component: {fileID: 377693459}
   m_Layer: 0
   m_Name: Multiplayer
   m_TagString: Untagged
@@ -658,7 +658,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 377693453}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1caa0a7c0ebcac543968a2fd0d4dbb11, type: 3}
   m_Name: 
@@ -790,7 +790,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 377693453}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c279ae434eced374c94c1e2bec6527d7, type: 3}
   m_Name: 
@@ -804,7 +804,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 377693453}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 783336771e82e62458fddb8548a20c5a, type: 3}
   m_Name: 
@@ -818,7 +818,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   ForceSync: 1
---- !u!114 &377693458
+--- !u!114 &377693459
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -827,11 +827,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 377693453}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f4817b210c14e09ab5bb01e319790ef, type: 3}
+  m_Script: {fileID: 11500000, guid: 8c3e4207f6e74d8c9a3b7e1a5624cf90, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AlterunaDelayedStartup
+  m_EditorClassIdentifier: Assembly-CSharp::LanConnectionPanel
   multiplayerManager: {fileID: 377693454}
-  startupDelaySeconds: 8
+  networkTestSpawner: {fileID: 377693456}
+  targetCanvas: {fileID: 704749728}
 --- !u!1 &504497630 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8763101913705298807, guid: 5a577542a281e0a448dc3b383023e1f2, type: 3}
