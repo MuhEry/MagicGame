@@ -144,6 +144,7 @@ static class Faz2Setup
             log.AppendLine("            -> Tools > Gece Vardiyasi > Android Ag Iznini Zorunlu Yap");
 
         problems += CheckXrInput(log);
+        problems += CheckEditorXrStartup(log);
 
         // Rig'in altinda global namespace'li kendi scriptlerimiz olmamali:
         // Alteruna'nin avatar temizligi type.Namespace.Length okur ve NULL'da patlar.
@@ -622,6 +623,42 @@ static class Faz2Setup
         // Bu dosya repoya girmezse takimin geri kalaninda LAN kesfi kapali gelir.
         log.AppendLine("  [BILGI] " + path + " commit edilmeli - yoksa ekipteki digerlerinde " +
                        "bu ayarlarin hicbiri olmaz.");
+
+        return problems;
+    }
+
+    /// <summary>
+    /// EDITORDE PLAY'E BASINCA UNITY KAPANIYORSA ILK BAKILACAK YER BURASI.
+    ///
+    /// Standalone hedefinde "Initialize XR on Startup" acikken Play'e basmak,
+    /// editorun ana dongusunu gozlugun kare temposuna baglar. Gozluk takili/uyanik
+    /// degilse (veya Link kopuksa) editor donar ya da sessizce kapanir: log
+    /// "Shut down." ile biter, crash dump YOKTUR, tek satir istisna olusmaz.
+    /// Bu yuzden saatlerce oyun kodunda hata aranir - orada hata yoktur.
+    /// </summary>
+    static int CheckEditorXrStartup(StringBuilder log)
+    {
+        if (!EditorBuildSettings.TryGetConfigObject(
+                UnityEngine.XR.Management.XRGeneralSettings.k_SettingsKey,
+                out UnityEditor.XR.Management.XRGeneralSettingsPerBuildTarget perTarget) ||
+            perTarget == null)
+        {
+            log.AppendLine("  [ATLA] Aktif XR yapilandirmasi okunamadi.");
+            return 0;
+        }
+
+        UnityEngine.XR.Management.XRGeneralSettings standalone =
+            perTarget.SettingsForBuildTarget(BuildTargetGroup.Standalone);
+
+        if (standalone == null)
+            return 0;
+
+        int problems = Report(log, !standalone.InitManagerOnStart,
+            "Standalone 'Initialize XR on Startup' KAPALI (Play'de editor olmuyor)");
+
+        if (standalone.InitManagerOnStart)
+            log.AppendLine("            -> Tools > Gece Vardiyasi > Editorde XR Baslatmayi Kapat (Standalone)\n" +
+                           "               ANDROID HEDEFI DEGISMEZ; APK'da VR aynen calisir.");
 
         return problems;
     }
