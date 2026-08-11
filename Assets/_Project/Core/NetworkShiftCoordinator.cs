@@ -511,7 +511,11 @@ public sealed class NetworkShiftCoordinator : AttributesSync
             m_ShiftManager.OnStateChanged += HandleShiftStateChanged;
 
         m_Subscribed = true;
-        Debug.Log("[Network] Alteruna kopru baglandi, oda olaylari dinleniyor.", this);
+        Debug.Log("[Network] Alteruna kopru baglandi, oda olaylari dinleniyor.\n" +
+                  "NOT: Console'da 'Project query failed: Unregistered' KIRMIZI hatasi normaldir " +
+                  "ve LAN oyununu ENGELLEMEZ. MultiplayerManager.Awake buluta proje sorgusu atar; " +
+                  "biz bulutu kullanmiyoruz. Host/JoinLan/DirectConnect bu sorguya hic bakmaz, " +
+                  "kayitsiz projede oda siniri 3 kullanicidir (bize 2 lazim).", this);
     }
 
     void Unsubscribe()

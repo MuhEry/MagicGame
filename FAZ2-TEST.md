@@ -98,8 +98,34 @@ degisikligi oldugu icin kurulum komutuna DAHIL DEGIL, ayri ve istenerek calisir.
 `Assets/link.xml` IL2CPP kirpmasini zaten engelliyor; Managed Stripping Level'i
 dusurmenize gerek yok.
 
-**Lisans / Application ID gerekmiyor.** Bu kurulum bulut kullanmadigi icin
-`Window > Alteruna > Register license` adimi atlanabilir.
+### "Project query failed: Unregistered" hatasi — NORMAL
+
+Play'e basinca Console'a KIRMIZI su satir duser:
+
+```
+Project query failed: Unregistered.
+Please register your project under Window->Alteruna->Register Project.
+```
+
+**Bu hata LAN oyununu engellemez.** `MultiplayerManager.Awake` buluta asenkron bir
+proje sorgusu atar; `ConnectOnStart` kapali olsa bile calisir. Ama LAN zinciri bu
+sorguya hic bakmaz:
+
+| Cagri | Ic zincir | API'ye bakiyor mu |
+|---|---|---|
+| `Host()` | `OpenPort()` + `JoinOwnRoom()` | hayir |
+| `JoinLan()` | `Connect()` | hayir |
+| `DirectConnect(ip)` | — | hayir |
+
+Kritik nokta: kayitsiz projede oda kullanici siniri **3**'tur (`Service.A()` kimlik
+dogrulanmamissa 3 doner). Oda kurulurken `MaxUsers = Min(2, 3) = 2` olur — bize
+zaten 2 lazim.
+
+Kayit yalnizca BULUT ozelliklerini acar (oda listesi, matchmaking, uzak sunucu);
+bu projede hicbiri kullanilmiyor. Yine de susturmak isterseniz
+portal.mp2.alteruna.com'dan kayit olabilirsiniz — ama Application ID
+`Assets/Alteruna/Resources` altina yazilir ve **o klasor Alteruna'nin kendi
+`.gitignore`unda**, yani herkes kendi makinesinde ayri ayri kaydolmak zorunda kalir.
 
 ### Commit edilmesi gereken iki dosya
 
