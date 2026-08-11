@@ -204,10 +204,16 @@ public sealed class NetworkShiftCoordinator : AttributesSync
             return false;
         }
 
-        // Servis daha ayaga kalkmadiysa cagri sessizce dusebilir. Engellemiyoruz
-        // (Host/JoinLan servisi kendisi baslatir) ama durumu gorunur kiliyoruz.
-        if (!Multiplayer.Started)
-            Debug.LogWarning("[Network] Alteruna servisi henuz baslamadi; istek yine de gonderiliyor.", this);
+        // MultiplayerManager sahnede KAPALI durur; Play'e basmak hicbir soket acmaz.
+        // Ag yalnizca oyuncu bu butona bastiginda ayaga kalkar.
+        //
+        // Not: Host() ve Connect() zaten kendilerini enable edip Start() cagiriyor,
+        // ama biz de acikca aciyoruz ki niyet kodda gorunur olsun.
+        if (!Multiplayer.enabled)
+        {
+            Multiplayer.enabled = true;
+            Debug.Log("[Network] Alteruna bileseni ETKINLESTIRILDI (ag simdi ayaga kalkiyor).", this);
+        }
 
         return true;
     }

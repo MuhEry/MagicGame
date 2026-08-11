@@ -52,13 +52,15 @@ static class Faz2Setup
         var log = new StringBuilder();
 
         MultiplayerManager manager = EnsureMultiplayerManager(log);
-        DisableCloudAutoConnect(manager, log);
         Spawner spawner = EnsureSpawner(manager, log);
         EnsureCoordinator(log);
         EnsurePlayerRefs(log);
         WireItemSpawner(spawner, log);
         PrepareItemPrefabs(log);
         EnsureAvatarPrefab(manager, log);
+
+        // EN SONA: bileseni kapatmak, once yapilan alan yazmalarini engellemesin.
+        DisableNetworkOnPlay(manager, log);
 
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         AssetDatabase.SaveAssets();
@@ -73,8 +75,15 @@ static class Faz2Setup
         var log = new StringBuilder();
         int problems = 0;
 
-        var manager = Object.FindFirstObjectByType<MultiplayerManager>();
+        // Include: bilesen KAPALI oldugu icin varsayilan arama onu bulamaz.
+        var manager = Object.FindFirstObjectByType<MultiplayerManager>(FindObjectsInactive.Include);
         problems += Report(log, manager != null, "MultiplayerManager sahnede");
+
+        // Play'e basmak hicbir soket acmamali; ag yalnizca butona basilinca kalkar.
+        problems += Report(log, manager != null && !manager.enabled,
+            "MultiplayerManager bileseni KAPALI (Play'de ag ayaga kalkmiyor)");
+        if (manager != null && manager.enabled)
+            log.AppendLine("            -> Tools > Gece Vardiyasi > Agi Play'de Kapali Baslat");
 
         var coordinator = Object.FindFirstObjectByType<NetworkShiftCoordinator>();
         problems += Report(log, coordinator != null, "NetworkShiftCoordinator sahnede");
@@ -264,7 +273,8 @@ static class Faz2Setup
 
     static MultiplayerManager EnsureMultiplayerManager(StringBuilder log)
     {
-        var manager = Object.FindFirstObjectByType<MultiplayerManager>();
+        // Include: onceki kurulumda bilesen kapatilmis olabilir.
+        var manager = Object.FindFirstObjectByType<MultiplayerManager>(FindObjectsInactive.Include);
         if (manager == null)
         {
             var go = new GameObject("Multiplayer");
@@ -301,21 +311,28 @@ static class Faz2Setup
     }
 
     /// <summary>
-    /// Play'e basar basmaz BULUTA baglanmayi kapatir.
+    /// Play'e basildiginda AG HIC AYAGA KALKMASIN.
     ///
-    /// KILITLENMENIN SEBEBI BUYDU: ConnectOnStart acikken MultiplayerManager, Play
-    /// aninda Alteruna bulutuna baglanmayi dener. Projede kayitli bir Application ID
-    /// / lisans yoksa (Assets/Alteruna/Resources bos ve zaten .gitignore'da) bu
-    /// deneme cevapsiz kalir; XR baslatmasiyla ust uste binince editor kilitlenmis
-    /// gorunur.
+    /// ONEMLI - ConnectOnStart ISE YARAMIYOR: bu SDK surumunde `ConnectOnStart`
+    /// yalnizca yapicida ve GetDebuggingInfo metninde geciyor, hicbir davranisi
+    /// KOSULLANDIRMIYOR (IL ile dogrulandi). Unity'nin otomatik cagirdigi
+    /// `MultiplayerManager.Start()` kosulsuz olarak `Service.Start()` +
+    /// `OpenPort()` calistiriyor: Play'e basar basmaz soketler aciliyor,
+    /// LAN kesfi basliyor ve editor kilitlenebiliyor.
     ///
-    /// Iki gozluk ayni odada oldugu icin buluta HIC ihtiyacimiz yok: baglanti
-    /// yalnizca oyuncu Host / JoinLan butonuna bastiginda, LAN uzerinden kurulur.
+    /// GERCEK COZUM: bileseni KAPALI birak. Unity devre disi bilesende `Start()`
+    /// cagirmaz - hicbir soket acilmaz. `Awake` yine calisir (zararsiz) ve
+    /// `FindObjectsOfType` devre disi bileseni bulmaya devam ettigi icin
+    /// koprumuz `Multiplayer` referansini kaybetmez.
+    ///
+    /// Butona basildiginda SDK kendini ayaga kaldirir: hem `Host()` hem
+    /// `Connect()` icinde `enabled = true` + `Start()` cagrisi var.
     /// </summary>
-    static void DisableCloudAutoConnect(MultiplayerManager manager, StringBuilder log)
+    static void DisableNetworkOnPlay(MultiplayerManager manager, StringBuilder log)
     {
         var serialized = new SerializedObject(manager);
 
+        // Davranisa etkisi yok ama Inspector'da niyet okunur dursun.
         SerializedProperty connectOnStart = serialized.FindProperty("ConnectOnStart");
         if (connectOnStart != null)
             connectOnStart.boolValue = false;
@@ -325,9 +342,37 @@ static class Faz2Setup
         if (maxPlayers != null)
             maxPlayers.intValue = 2;
 
+        // ASIL DUZELTME: bileseni kapat.
+        SerializedProperty enabled = serialized.FindProperty("m_Enabled");
+        if (enabled != null)
+            enabled.boolValue = false;
+
         serialized.ApplyModifiedProperties();
 
-        log.AppendLine("= ConnectOnStart KAPATILDI (buluta otomatik baglanma yok), MaxPlayers = 2.");
+        log.AppendLine("= MultiplayerManager bileseni KAPATILDI: Play'e basmak artik hicbir soket acmiyor.");
+        log.AppendLine("  (Host / JoinLan butonuna basilinca SDK kendini ayaga kaldirir.)");
+        log.AppendLine("= MaxPlayers = 2.");
+    }
+
+    /// <summary>
+    /// Kurulumun tamamini tekrar calistirmadan yalnizca "Play'de ag kapali" ayarini uygular.
+    /// Prefablari ve sahne hiyerarsisini ELLEMEZ.
+    /// </summary>
+    [MenuItem("Tools/Gece Vardiyasi/Agi Play'de Kapali Baslat", false, 42)]
+    static void DisableNetworkOnPlayOnly()
+    {
+        var manager = Object.FindFirstObjectByType<MultiplayerManager>(FindObjectsInactive.Include);
+        if (manager == null)
+        {
+            Debug.LogError("[Faz 2] Sahnede MultiplayerManager yok.");
+            return;
+        }
+
+        var log = new StringBuilder();
+        DisableNetworkOnPlay(manager, log);
+
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+        Debug.Log("[Faz 2]\n" + log + "\nSahne KAYDEDILMEDI - Ctrl+S ile kendin kaydet.");
     }
 
     static void EnsureCoordinator(StringBuilder log)
