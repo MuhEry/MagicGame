@@ -43,6 +43,7 @@ Ortak hata defteri. **Kural: her hata + cozumu TEK SATIR.** Uzun aciklama yazma.
 | 12 | LAN | Internet acikken kayitli `MultiplayerManager.Awake()` Alteruna `/project` isteginde Quest'i donduruyor | LAN branch'inde `ApplicationData` GUID'i bos; lisans istegi atlanir, bir cihaz `Host()`, digeri `JoinLan()` kullanir. |
 | 13 | LAN | Manager'i 8 saniye gec baslatmak gri ekran donmasini sadece geciktirdi | `AlterunaDelayedStartup` kaldirildi; LAN icin sabit bekleme kullanma. |
 | 14 | LAN | Iki cihaz baglansa bile yerel `Instantiate` ile uretilen vardiya nesneleri ortak degil | Ilk testte yalniz host `Spawner.Spawn()` cagirir ve `ForceSync` aciktir; test kupu dogrulanmadan `ItemSpawner` ag koduna cevrilmez. |
+| 15 | LAN | Unity yeniden acilinca Alteruna editoru bos `ApplicationData` GUID'ini kayitli projeyle geri yazdi; lisans sorgusu ve `No valid port for transport type Default` geri geldi | Manager sahnede kapali tutulur; `LanConnectionPanel` once bellek config'ini `Guid.Empty` yapar, basariliysa Manager'i etkinlestirir. |
 
 ## LAN sabah testi
 

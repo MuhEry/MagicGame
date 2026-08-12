@@ -1,0 +1,5 @@
+<linker>
+  <assembly fullname="Alteruna.Multiplayer.Unity">
+    <type fullname="Alteruna.Multiplayer.Unity.Configs.AlterunaApplicationData" preserve="all" />
+  </assembly>
+</linker>

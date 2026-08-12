@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Reflection;
 using AlterunaComponents;
 using TMPro;
 using UnityEngine;
@@ -11,6 +12,7 @@ using UnityEngine.UI;
 /// Runtime-built, VR-compatible control panel for Alteruna's LAN sample flow.
 /// No cloud connection is attempted: one device calls Host, the other JoinLan.
 /// </summary>
+[DefaultExecutionOrder(-1000)]
 public sealed class LanConnectionPanel : MonoBehaviour
 {
     [SerializeField] private MultiplayerManager multiplayerManager;
@@ -32,6 +34,23 @@ public sealed class LanConnectionPanel : MonoBehaviour
 
         if (networkTestSpawner == null)
             networkTestSpawner = GetComponent<NetworkTestSpawner>();
+
+        if (multiplayerManager == null)
+            return;
+
+        // The Alteruna editor can restore the registered cloud project asset.
+        // Keep the manager disabled until the in-memory config is explicitly
+        // changed to unregistered, otherwise Awake performs the blocking
+        // cloud license request before the LAN UI can appear.
+        multiplayerManager.enabled = false;
+        if (!ApplyLanOnlyApplicationData())
+        {
+            Debug.LogError("[LAN] Offline Alteruna ayari uygulanamadi; bulut sorgusunu engellemek icin MultiplayerManager kapali tutuluyor.", this);
+            return;
+        }
+
+        multiplayerManager.enabled = true;
+        Debug.Log("[LAN] Offline Alteruna ayari uygulandi; bulut lisans dogrulamasi devre disi.", this);
     }
 
     private void Start()
@@ -333,19 +352,17 @@ public sealed class LanConnectionPanel : MonoBehaviour
     {
         try
         {
-            foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (networkInterface.OperationalStatus != OperationalStatus.Up ||
-                    networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                    continue;
+            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
 
-                foreach (UnicastIPAddressInformation address in networkInterface.GetIPProperties().UnicastAddresses)
-                {
-                    if (address.Address.AddressFamily == AddressFamily.InterNetwork &&
-                        !IPAddress.IsLoopback(address.Address))
-                        return address.Address.ToString();
-                }
-            }
+            // Quest and the intended PC fallback both use Wi-Fi. Prefer that
+            // address so VirtualBox/Hyper-V adapters are not shown in the UI.
+            string wirelessAddress = FindIPv4Address(interfaces, wirelessOnly: true);
+            if (!string.IsNullOrEmpty(wirelessAddress))
+                return wirelessAddress;
+
+            string physicalAddress = FindIPv4Address(interfaces, wirelessOnly: false);
+            if (!string.IsNullOrEmpty(physicalAddress))
+                return physicalAddress;
         }
         catch (Exception exception)
         {
@@ -353,5 +370,66 @@ public sealed class LanConnectionPanel : MonoBehaviour
         }
 
         return "IP bulunamadi";
+    }
+
+    private static string FindIPv4Address(NetworkInterface[] interfaces, bool wirelessOnly)
+    {
+        foreach (NetworkInterface networkInterface in interfaces)
+        {
+            if (networkInterface.OperationalStatus != OperationalStatus.Up ||
+                networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                networkInterface.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+                continue;
+
+            if (wirelessOnly && networkInterface.NetworkInterfaceType != NetworkInterfaceType.Wireless80211)
+                continue;
+
+            string description = $"{networkInterface.Name} {networkInterface.Description}".ToLowerInvariant();
+            if (description.Contains("virtual") ||
+                description.Contains("virtualbox") ||
+                description.Contains("vmware") ||
+                description.Contains("hyper-v") ||
+                description.Contains("loopback"))
+                continue;
+
+            foreach (UnicastIPAddressInformation address in networkInterface.GetIPProperties().UnicastAddresses)
+            {
+                if (address.Address.AddressFamily == AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(address.Address) &&
+                    !address.Address.ToString().StartsWith("169.254.", StringComparison.Ordinal))
+                    return address.Address.ToString();
+            }
+        }
+
+        return null;
+    }
+
+    private static bool ApplyLanOnlyApplicationData()
+    {
+        UnityEngine.Object applicationData = Resources.Load("ApplicationData");
+        if (applicationData == null)
+        {
+            Debug.LogError("[LAN] Alteruna ApplicationData resource bulunamadi.");
+            return false;
+        }
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        Type dataType = applicationData.GetType();
+        FieldInfo applicationIdField = dataType.GetField("_applicationId", flags);
+        FieldInfo projectGuidField = dataType.GetField("_projectIDGuid", flags);
+        FieldInfo subIdField = dataType.GetField("_subId", flags);
+        FieldInfo subGuidField = dataType.GetField("_subIdGuid", flags);
+
+        if (applicationIdField == null || projectGuidField == null)
+        {
+            Debug.LogError("[LAN] Alteruna ApplicationData alanlari bulunamadi; paket API'si degismis olabilir.");
+            return false;
+        }
+
+        applicationIdField.SetValue(applicationData, string.Empty);
+        projectGuidField.SetValue(applicationData, Guid.Empty);
+        subIdField?.SetValue(applicationData, string.Empty);
+        subGuidField?.SetValue(applicationData, null);
+        return true;
     }
 }
