@@ -42,7 +42,10 @@ public sealed class NetworkTestSpawner : MonoBehaviour
             return;
         }
 
-        if (multiplayerManager == null || !multiplayerManager.IsConnected || !multiplayerManager.InRoom)
+        // LAN host, yerel odasini kurdugunda InRoom=true olur; IsConnected ise
+        // uzak bir endpoint baglantisini ifade ettigi icin host tarafinda false
+        // kalabilir. Spawn icin oda ve host yetkisi yeterlidir.
+        if (multiplayerManager == null || !multiplayerManager.InRoom)
         {
             Debug.LogWarning("[NetTestSpawn] Bir LAN odasina bagli degilsin.", this);
             return;
