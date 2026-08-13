@@ -28,6 +28,8 @@ public sealed class LanConnectionPanel : MonoBehaviour
     private Button joinButton;
     private Button spawnButton;
     private Button shiftButton;
+    private Button resetItemButton;
+    private ItemSpawner itemSpawner;
     private float nextStatusRefresh;
     private string lastStateSnapshot;
     private int connectionAttempt;
@@ -52,6 +54,8 @@ public sealed class LanConnectionPanel : MonoBehaviour
 
         if (networkTestSpawner == null)
             networkTestSpawner = GetComponent<NetworkTestSpawner>();
+
+        itemSpawner = FindFirstObjectByType<ItemSpawner>();
 
         // Alteruna V2 2.1.1r3'te ConnectOnStart alani otomatik Start akisini
         // durdurmuyor. Manager aktif kalirsa daha oyuncu Host/Join secmeden
@@ -164,6 +168,21 @@ public sealed class LanConnectionPanel : MonoBehaviour
         networkTestSpawner.SpawnTestObject();
     }
 
+    public void ResetCurrentItem()
+    {
+        if (itemSpawner == null)
+            itemSpawner = FindFirstObjectByType<ItemSpawner>();
+
+        if (itemSpawner == null)
+        {
+            SetStatus("ItemSpawner bulunamadi.");
+            return;
+        }
+
+        itemSpawner.ResetCurrentItem();
+        SetStatus("Aktif esya bacada sifirlaniyor...");
+    }
+
     private void RunConnectionAction(string operation, string pendingMessage, Action action)
     {
         // IsConnected, Alteruna servis baglantisini da kapsar. Lisans
@@ -225,6 +244,8 @@ public sealed class LanConnectionPanel : MonoBehaviour
             spawnButton.interactable = inRoom && isHost;
         if (shiftButton != null)
             shiftButton.interactable = inRoom && isHost;
+        if (resetItemButton != null)
+            resetItemButton.interactable = inRoom && isHost && itemSpawner != null && itemSpawner.CurrentSpawnedItem != null;
 
         string service = inRoom ? "OTURUMDA" : connecting ? "BAGLANIYOR" : serviceConnected ? "BAGLI" : "HAZIR";
         string role = inRoom ? (isHost ? "HOST" : "CLIENT") : "-";
@@ -656,7 +677,7 @@ public sealed class LanConnectionPanel : MonoBehaviour
         panel.anchorMax = new Vector2(1f, 1f);
         panel.pivot = new Vector2(1f, 1f);
         panel.anchoredPosition = new Vector2(-20f, -20f);
-        panel.sizeDelta = new Vector2(440f, 410f);
+        panel.sizeDelta = new Vector2(440f, 480f);
 
         Image background = panel.gameObject.AddComponent<Image>();
         background.color = new Color(0.035f, 0.05f, 0.07f, 0.94f);
@@ -671,6 +692,7 @@ public sealed class LanConnectionPanel : MonoBehaviour
         hostButton = CreateButton("Host LAN", panel, "HOST LAN", new Vector2(20f, -145f), HostLan);
         joinButton = CreateButton("Join LAN", panel, "JOIN LAN", new Vector2(230f, -145f), JoinLan);
         spawnButton = CreateButton("Spawn Test", panel, "HOST: TEST KUPU URET", new Vector2(20f, -218f), SpawnTestObject, 400f);
+        resetItemButton = CreateButton("Reset Item", panel, "NESNEYI SIFIRLA", new Vector2(20f, -286f), ResetCurrentItem, 400f);
 
         TMP_Text hint = CreateText(
             "Hint",
@@ -679,7 +701,7 @@ public sealed class LanConnectionPanel : MonoBehaviour
             17f,
             FontStyles.Normal);
         hint.color = new Color(0.72f, 0.72f, 0.72f, 1f);
-        SetRect(hint.rectTransform, new Vector2(20f, -292f), new Vector2(400f, 70f));
+        SetRect(hint.rectTransform, new Vector2(20f, -360f), new Vector2(400f, 70f));
     }
 
     private static Button CreateButton(

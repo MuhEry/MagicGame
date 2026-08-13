@@ -70,6 +70,9 @@ public class TelemetryLogger : MonoBehaviour
 
     private void WriteDecision(DecisionResult result)
     {
+        if (shiftManager == null || !shiftManager.IsHostAuthority)
+            return;
+
         try
         {
             string directory = Application.persistentDataPath;

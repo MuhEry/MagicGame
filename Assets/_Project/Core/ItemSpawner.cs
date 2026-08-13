@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using AlterunaComponents;
 using UnityEngine;
@@ -35,6 +36,8 @@ public class ItemSpawner : MonoBehaviour
     private readonly List<ItemSpawnEntry> spawnQueue = new List<ItemSpawnEntry>();
     private System.Random random;
     private int nextQueueIndex;
+    private ItemSpawnEntry currentEntry;
+    private Coroutine resetRoutine;
 
     /// <summary>
     /// Bacadan bir esya dustugu anda tetiklenir. Ses/isik gibi sunum efektleri
@@ -81,6 +84,14 @@ public class ItemSpawner : MonoBehaviour
         if (!CanHostSpawn())
             return;
 
+        if (resetRoutine != null)
+        {
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
+        }
+
+        CleanupSpawnedItems();
+
         // seed 0 ise her vardiya farkli bir sira. UnityEngine.Random KULLANILMAZ
         // (mimari kural 4) - tohum Environment.TickCount'tan alinir, uretim yine
         // System.Random ile deterministiktir. Loglanan seed ile ayni tur tekrar oynatilabilir.
@@ -96,11 +107,7 @@ public class ItemSpawner : MonoBehaviour
                 spawnQueue.Add(entry);
         }
 
-        for (int index = spawnQueue.Count - 1; index > 0; index--)
-        {
-            int swapIndex = random.Next(index + 1);
-            (spawnQueue[index], spawnQueue[swapIndex]) = (spawnQueue[swapIndex], spawnQueue[index]);
-        }
+        ShuffleQueue();
 
         nextQueueIndex = 0;
         IsSpawning = true;
@@ -114,19 +121,37 @@ public class ItemSpawner : MonoBehaviour
         if (!CanHostSpawn())
             return null;
 
+        if (CurrentSpawnedItem != null)
+        {
+            Debug.LogWarning("[ItemSpawner] Aktif esya varken yenisi uretilmedi.", this);
+            return CurrentSpawnedItem;
+        }
+
         if (!IsSpawning)
         {
             Debug.LogWarning("ItemSpawner: Vardiya başlamadan eşya üretilemez.", this);
             return null;
         }
 
-        if (nextQueueIndex >= spawnQueue.Count)
+        if (spawnQueue.Count == 0)
         {
-            Debug.Log("ItemSpawner: Bu vardiya için tanımlı tüm eşyalar üretildi.", this);
+            Debug.LogWarning("[ItemSpawner] Uretilecek esya tanimi yok.", this);
             return null;
         }
 
+        if (nextQueueIndex >= spawnQueue.Count)
+        {
+            ShuffleQueue();
+            nextQueueIndex = 0;
+            Debug.Log("[ItemSpawner] Vardiya suruyor; esya sirasi yeniden karistirildi.", this);
+        }
+
         ItemSpawnEntry entry = spawnQueue[nextQueueIndex++];
+        return SpawnEntry(entry);
+    }
+
+    private GameObject SpawnEntry(ItemSpawnEntry entry)
+    {
         Transform point = spawnPoint != null ? spawnPoint : transform;
 
         // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
@@ -141,6 +166,7 @@ public class ItemSpawner : MonoBehaviour
         if (CurrentSpawnedItem == null)
             return null;
 
+        currentEntry = entry;
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
         ItemSpawned?.Invoke(CurrentSpawnedItem);
@@ -160,7 +186,69 @@ public class ItemSpawner : MonoBehaviour
 
         networkSpawner.Despawn(item);
         if (CurrentSpawnedItem == item)
+        {
             CurrentSpawnedItem = null;
+            currentEntry = null;
+        }
+    }
+
+    public void ResetCurrentItem()
+    {
+        if (!CanHostSpawn() || resetRoutine != null)
+            return;
+
+        if (CurrentSpawnedItem == null || currentEntry == null)
+        {
+            Debug.LogWarning("[ItemSpawner] Sifirlanacak aktif esya yok.", this);
+            return;
+        }
+
+        resetRoutine = StartCoroutine(ResetCurrentItemRoutine(currentEntry));
+    }
+
+    private IEnumerator ResetCurrentItemRoutine(ItemSpawnEntry entry)
+    {
+        networkSpawner.Despawn(CurrentSpawnedItem);
+        CurrentSpawnedItem = null;
+        currentEntry = null;
+
+        yield return new WaitForSecondsRealtime(0.2f);
+
+        if (IsSpawning && CanHostSpawn())
+        {
+            SpawnEntry(entry);
+            Debug.Log($"[ItemSpawner] Esya bacada sifirlandi: {entry.prefab.name}", this);
+        }
+
+        resetRoutine = null;
+    }
+
+    private void CleanupSpawnedItems()
+    {
+        var spawned = new List<GameObject>();
+        foreach (var record in networkSpawner.SpawnedObjects)
+        {
+            if (record.Item1 != null)
+                spawned.Add(record.Item1);
+        }
+
+        foreach (GameObject item in spawned)
+            networkSpawner.Despawn(item);
+
+        CurrentSpawnedItem = null;
+        currentEntry = null;
+
+        if (spawned.Count > 0)
+            Debug.Log($"[ItemSpawner] Yeni vardiya oncesi {spawned.Count} eski ag esyasi temizlendi.", this);
+    }
+
+    private void ShuffleQueue()
+    {
+        for (int index = spawnQueue.Count - 1; index > 0; index--)
+        {
+            int swapIndex = random.Next(index + 1);
+            (spawnQueue[index], spawnQueue[swapIndex]) = (spawnQueue[swapIndex], spawnQueue[index]);
+        }
     }
 
     private void ConfigureNetworkSpawner()

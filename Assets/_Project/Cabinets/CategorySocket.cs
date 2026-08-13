@@ -1,4 +1,5 @@
 using System.Collections;
+using Alteruna.Multiplayer.Unity;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -46,11 +47,6 @@ public class CategorySocket : XRSocketInteractor
     [SerializeField, Min(0f)]
     float m_EjectIgnoreDuration = 1.5f;
 
-    [Header("Doğru yerleştirme")]
-    [Tooltip("Doğru karar geri bildirimi görünür kaldıktan sonra eşyanın kaldırılacağı süre.")]
-    [SerializeField, Min(0f)]
-    float m_AcceptDelay = 0.3f;
-
     [Header("Geri bildirim")]
     [Tooltip("Bos birakilirsa ust objelerde aranir (genelde dolap kokunde durur).")]
     [SerializeField]
@@ -66,10 +62,7 @@ public class CategorySocket : XRSocketInteractor
     // Yanlis esya disari atilirken baska bir esyayi iceri almamak icin kilit.
     bool m_Rejecting;
     Coroutine m_RejectRoutine;
-
-    // Dogru esya tuketilirken (geri bildirim + yok etme) ayni kilit.
-    bool m_Accepting;
-    Coroutine m_AcceptRoutine;
+    ShiftManager m_ShiftManager;
 
     // Disari atilan esya trigger'dan cikamazsa soket onu aninda tekrar yakalar.
     // Son atilan esyayi kisa bir sure yok sayiyoruz.
@@ -89,19 +82,32 @@ public class CategorySocket : XRSocketInteractor
 
         if (m_Feedback == null)
             m_Feedback = GetComponentInParent<FeedbackController>();
+
+        m_ShiftManager = FindFirstObjectByType<ShiftManager>();
+    }
+
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+
+        if (m_ShiftManager == null)
+            m_ShiftManager = FindFirstObjectByType<ShiftManager>();
+        if (m_ShiftManager != null)
+            m_ShiftManager.OnDecision += ApplyDecisionResult;
     }
 
     /// <inheritdoc />
     protected override void OnDisable()
     {
+        if (m_ShiftManager != null)
+            m_ShiftManager.OnDecision -= ApplyDecisionResult;
+
         base.OnDisable();
 
         // Soket devre disi kalirsa coroutine'ler oldurulur ama bayraklar kalir.
         // Sifirlanmazsa dolap tekrar acildiginda kilitli kalir ve hicbir esya kabul etmez.
         m_Rejecting = false;
-        m_Accepting = false;
         m_RejectRoutine = null;
-        m_AcceptRoutine = null;
     }
 
     /// <inheritdoc />
@@ -116,11 +122,6 @@ public class CategorySocket : XRSocketInteractor
         // (Su an reddedilmekte olan esya icin true donmeye devam etmeliyiz, yoksa
         //  XRI onu aninda birakir ve 0,4 sn'lik bekleme calismaz.)
         if (m_Rejecting && !IsSelecting(interactable))
-            return false;
-
-        // Ayni sey dogru esya tuketilirken de gecerli: 0,3 sn'lik geri bildirim
-        // penceresinde araya baska bir esya girmesin.
-        if (m_Accepting && !IsSelecting(interactable))
             return false;
 
         // Yeni disari atilan esyayi kisa sure yok say.
@@ -186,9 +187,9 @@ public class CategorySocket : XRSocketInteractor
         // B'nin geçici test küplerinde ItemProbe olmadığından değer 0 kalır.
         int shakeCount = GetShakeCount(interactable);
 
-        if (ShiftManager.Instance != null && ShiftManager.Instance.State == ShiftState.Vardiya)
+        if (m_ShiftManager != null && m_ShiftManager.State == ShiftState.Vardiya)
         {
-            ShiftManager.Instance.RegisterDecision(
+            m_ShiftManager.RegisterDecision(
                 itemId,
                 itemCategory,
                 m_AcceptedCategory,
@@ -202,28 +203,7 @@ public class CategorySocket : XRSocketInteractor
             $"inceleme={inspectMs:F0} ms",
             this);
 
-        // Uc kanal ayni anda: gorsel (0,3 sn emissive) + isitsel + haptik.
-        if (m_Feedback != null)
-            m_Feedback.PlayDecision(isCorrect);
-        else
-            Debug.LogWarning($"[CategorySocket] '{name}' uzerinde FeedbackController yok - sadece log var.", this);
-
-        if (isCorrect)
-        {
-            // Zaten bir esya tuketiliyorsa rutini YENIDEN BASLATMA.
-            // Eski kod burada StopCoroutine cagiriyordu: soket, esyayi biraktiktan
-            // sonraki bir karelik boslukta ayni esyayi tekrar yakaliyor, bu yeniden
-            // giris rutini Destroy satirina varmadan olduruyordu. Sonuc: esya hic
-            // yok olmuyor ve arka arkaya "DOGRU" sinyali basiliyordu.
-            if (m_AcceptRoutine == null)
-                m_AcceptRoutine = StartCoroutine(AcceptRoutine(interactable));
-        }
-        else
-        {
-            // Kabul tarafiyla ayni kural: calisan rutini YENIDEN BASLATMA.
-            if (m_RejectRoutine == null)
-                m_RejectRoutine = StartCoroutine(RejectRoutine(interactable));
-        }
+        // Karar ve fizik hostta uygulanir. Her cihaz geri bildirimi OnDecision ile yerel oynatir.
     }
 
     /// <inheritdoc />
@@ -280,38 +260,33 @@ public class CategorySocket : XRSocketInteractor
         return probe != null ? Mathf.Max(0, probe.ShakeCount) : 0;
     }
 
-    /// <summary>
-    /// Doğru eşya geri bildirimin ardından soketten çıkarılır ve kaldırılır.
-    /// Böylece aynı kategorideki sonraki eşya için soket boş kalır.
-    /// </summary>
-    IEnumerator AcceptRoutine(IXRSelectInteractable interactable)
+    void ApplyDecisionResult(DecisionResult result)
     {
-        m_Accepting = true;
+        if (result.chosen != m_AcceptedCategory)
+            return;
 
-        var itemTransform = interactable?.transform;
+        if (m_Feedback != null)
+            m_Feedback.PlayDecision(result.isCorrect);
 
-        if (m_AcceptDelay > 0f)
-            yield return new WaitForSeconds(m_AcceptDelay);
+        ReleaseMatchingSelection(result.itemId);
 
-        // ONEMLI SIRA: esyayi ONCE etkilesim disina al, SONRA birak.
-        // Devre disi birakilan bir interactable XRI'dan otomatik olarak cikar ve
-        // secim iptal edilir. Boylece "birakma" ile "yok etme" arasindaki karede
-        // soket ayni esyayi TEKRAR yakalayamaz.
-        if (itemTransform != null)
-            itemTransform.gameObject.SetActive(false);
+        if (!result.isCorrect && m_ShiftManager.IsHostAuthority && m_RejectRoutine == null)
+        {
+            var item = FindFirstObjectByType<ItemSpawner>()?.CurrentSpawnedItem;
+            var interactable = item != null ? item.GetComponentInChildren<XRGrabInteractable>() : null;
+            if (interactable != null)
+                m_RejectRoutine = StartCoroutine(RejectRoutine(interactable));
+        }
+    }
 
-        if (interactionManager != null && interactable != null && IsSelecting(interactable))
-            interactionManager.SelectExit(this, interactable);
-
-        yield return null;
-
-        // TODO(Faz 2): Agda Destroy dogrudan kullanilamaz; nesne yasam dongusu
-        //              ItemSpawner uzerinden despawn edilmeli (mimari kural 3).
-        if (itemTransform != null)
-            Destroy(itemTransform.gameObject);
-
-        m_Accepting = false;
-        m_AcceptRoutine = null;
+    void ReleaseMatchingSelection(int itemId)
+    {
+        for (int index = interactablesSelected.Count - 1; index >= 0; index--)
+        {
+            var selected = interactablesSelected[index];
+            if (TryResolveItem(selected, out int selectedId, out _, out _) && selectedId == itemId)
+                interactionManager.SelectExit(this, selected);
+        }
     }
 
     /// <summary>
@@ -332,21 +307,36 @@ public class CategorySocket : XRSocketInteractor
         m_LastEjected = interactable;
         m_LastEjectTime = Time.time;
 
-        if (interactionManager != null && interactable != null && IsSelecting(interactable))
-            interactionManager.SelectExit(this, interactable);
+        ReleaseMatchingSelection(TryResolveItem(interactable, out int itemId, out _, out _) ? itemId : -1);
 
         // XRGrabInteractable'in Rigidbody durumunu geri almasi icin bir kare bekle.
         yield return null;
 
         if (itemTransform != null)
         {
-            var rb = itemTransform.GetComponentInParent<Rigidbody>();
-            if (rb != null)
+            var sync = itemTransform.GetComponentInParent<RigidbodySynchronizable>();
+            if (sync != null)
             {
-                // SARTNAME "Onemli Noktalar #3": esya sokete girince kinematic olur;
-                // disari atarken kinematic'i kapatmayi unutma, yoksa havada asili kalir.
-                rb.isKinematic = false;
-                rb.AddForce(GetEjectDirection() * m_EjectSpeed, ForceMode.VelocityChange);
+                if (!sync.HasOwnership)
+                    sync.TakeOwnership(true);
+
+                float timeout = Time.time + 0.5f;
+                while (!sync.HasOwnership && Time.time < timeout)
+                    yield return null;
+
+                if (sync.HasOwnership)
+                {
+                    sync.isKinematic = false;
+                    sync.SyncSettings();
+                    sync.AddForce(GetEjectDirection() * m_EjectSpeed, ForceMode.VelocityChange);
+                    sync.ForceUpdate(true);
+                    yield return new WaitForFixedUpdate();
+                    sync.ReleaseOwnership();
+                }
+                else
+                {
+                    Debug.LogError("[CabinetHost] Esya sahipligi alinamadi; yanlis esya firlatilamadi.", this);
+                }
             }
         }
 

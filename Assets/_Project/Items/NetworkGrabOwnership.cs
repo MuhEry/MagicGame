@@ -12,12 +12,16 @@ public sealed class NetworkGrabOwnership : AttributesSync
     private RigidbodySynchronizable sync;
     private XRGrabInteractable grab;
     private bool waitingForOwnership;
+    private bool locallyHeld;
+    private int syncTick;
 
     private void Awake()
     {
         sync = GetComponent<RigidbodySynchronizable>();
         grab = GetComponent<XRGrabInteractable>();
         sync.AllowCollisionToAssumeOwner = false;
+        sync.SyncEveryNUpdates = 1;
+        sync.FullSyncEveryNSync = 2;
 
         grab.selectEntered.AddListener(OnGrabbed);
         grab.selectExited.AddListener(OnReleased);
@@ -45,19 +49,29 @@ public sealed class NetworkGrabOwnership : AttributesSync
 
     private void OnGrabbed(SelectEnterEventArgs _)
     {
+        locallyHeld = true;
+        sync.WakeUp();
+
         if (!sync.HasOwnership)
         {
             waitingForOwnership = true;
             sync.TakeOwnership(true);
+            return;
         }
+
+        holderIndex = Multiplayer.Me.Index;
+        sync.SendData = true;
+        ForceSync();
     }
 
     private void OnReleased(SelectExitEventArgs _)
     {
+        locallyHeld = false;
         waitingForOwnership = false;
         if (!sync.HasOwnership)
             return;
 
+        sync.ForceUpdate(true);
         holderIndex = -1;
         ForceSync();
         sync.ReleaseOwnership();
@@ -68,6 +82,15 @@ public sealed class NetworkGrabOwnership : AttributesSync
         bool heldByOther = holderIndex >= 0 && holderIndex != Multiplayer.Me.Index;
         if (grab.enabled == heldByOther)
             grab.enabled = !heldByOther;
+    }
+
+    private void FixedUpdate()
+    {
+        if (!locallyHeld || !sync.HasOwnership)
+            return;
+
+        sync.SendData = true;
+        sync.ForceUpdate(++syncTick % 2 == 0);
     }
 
     private void OnLockAcquired(LockAcquiredEvent args)
@@ -88,6 +111,7 @@ public sealed class NetworkGrabOwnership : AttributesSync
             return;
 
         waitingForOwnership = false;
+        locallyHeld = false;
         if (grab.isSelected)
             grab.interactionManager.CancelInteractableSelection((IXRSelectInteractable)grab);
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   id: 302
   displayName: Ors
-  category: 2
-  mass: 8
-  rattleClip: {fileID: 0}
-  glowColor: {r: 0, g: 0, b: 0, a: 1}
+  category: 0
+  mass: 1
+  rattleClip: {fileID: 8300000, guid: 16fba6d30ed741d4a9fdd6e79ee2f3ac, type: 3}
+  glowColor: {r: 0.20943397, g: 0.5102446, b: 1, a: 1}

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Alteruna.Multiplayer.Unity;
 using UnityEngine;
 
 public enum ShiftState
@@ -23,7 +24,7 @@ public struct ShiftReport
     public ItemCategory mostConfusedCategory;
 }
 
-public class ShiftManager : MonoBehaviour
+public class ShiftManager : AttributesSync
 {
     public static ShiftManager Instance;
 
@@ -42,16 +43,22 @@ public class ShiftManager : MonoBehaviour
 
     private Coroutine timerRoutine;
     private Coroutine nextItemRoutine;
-    private float remainingSeconds;
+    [SynchronizableField] private float remainingSeconds;
     private float totalInspectMs;
-    private int correctCount;
-    private int incorrectCount;
-    private int inspectedItemCount;
-    private int totalShakeCount;
-    private int currentSessionId;
+    [SynchronizableField] private int correctCount;
+    [SynchronizableField] private int incorrectCount;
+    [SynchronizableField] private int inspectedItemCount;
+    [SynchronizableField] private int totalShakeCount;
+    [SynchronizableField] private int currentSessionId;
+    [SynchronizableField] private int stateValue;
+    [SynchronizableField] private int shiftSeed;
     private int lastPublishedWholeSecond = -1;
+    private ShiftState lastObservedState = ShiftState.Hazir;
+    private int lastDecisionItemId = -1;
+    private ItemCategory lastDecisionCategory;
+    private float lastDecisionTime = float.NegativeInfinity;
 
-    public ShiftState State { get; private set; } = ShiftState.Hazir;
+    public ShiftState State => (ShiftState)stateValue;
     public float RemainingSeconds => remainingSeconds;
     public int CurrentSessionId => currentSessionId;
     public int CorrectCount => correctCount;
@@ -60,6 +67,7 @@ public class ShiftManager : MonoBehaviour
     public int TotalShakeCount => totalShakeCount;
     public int Score => correctCount;
     public ShiftReport LastReport { get; private set; }
+    public bool IsHostAuthority => Multiplayer != null && Multiplayer.InRoom && Multiplayer.IsHost();
 
     private void Awake()
     {
@@ -73,12 +81,30 @@ public class ShiftManager : MonoBehaviour
 
         if (itemSpawner == null)
             itemSpawner = FindFirstObjectByType<ItemSpawner>();
+
+        lastObservedState = State;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this)
             Instance = null;
+
+        base.OnDestroy();
+    }
+
+    private void Update()
+    {
+        if (IsHostAuthority)
+            return;
+
+        if (State != lastObservedState)
+        {
+            lastObservedState = State;
+            OnStateChanged?.Invoke(State);
+        }
+
+        PublishTime(false);
     }
 
     private void OnValidate()
@@ -92,6 +118,12 @@ public class ShiftManager : MonoBehaviour
     /// </summary>
     public void StartShift()
     {
+        if (!IsHostAuthority)
+        {
+            Debug.LogWarning("[ShiftNet] Vardiyayi yalnizca LAN hostu baslatabilir.", this);
+            return;
+        }
+
         if (State == ShiftState.Vardiya)
         {
             Debug.LogWarning("ShiftManager: Aktif vardiya yeniden başlatılamaz.", this);
@@ -124,9 +156,11 @@ public class ShiftManager : MonoBehaviour
         else
         {
             itemSpawner.BeginShift();
+            shiftSeed = itemSpawner.Seed;
             itemSpawner.SpawnNext();
         }
 
+        ForceSync();
         timerRoutine = StartCoroutine(RunShiftTimer());
     }
 
@@ -140,11 +174,83 @@ public class ShiftManager : MonoBehaviour
         float inspectMs,
         int shakeCount)
     {
+        if (!IsHostAuthority)
+        {
+            if (Multiplayer == null || !Multiplayer.InRoom)
+            {
+                Debug.LogWarning("[ShiftNet] Karar gonderilemedi; LAN odasinda degilsin.", this);
+                return;
+            }
+
+            BroadcastRemoteMethod(
+                nameof(ReceiveDecisionRequest),
+                itemId,
+                (int)correct,
+                (int)chosen,
+                inspectMs,
+                shakeCount);
+            return;
+        }
+
+        ApplyHostDecision(itemId, correct, chosen, inspectMs, shakeCount);
+    }
+
+    [SynchronizableMethod]
+    private void ReceiveDecisionRequest(
+        int itemId,
+        int correct,
+        int chosen,
+        float inspectMs,
+        int shakeCount)
+    {
+        if (!IsHostAuthority)
+            return;
+
+        ApplyHostDecision(
+            itemId,
+            (ItemCategory)correct,
+            (ItemCategory)chosen,
+            inspectMs,
+            shakeCount);
+    }
+
+    private void ApplyHostDecision(
+        int itemId,
+        ItemCategory correct,
+        ItemCategory chosen,
+        float inspectMs,
+        int shakeCount)
+    {
         if (State != ShiftState.Vardiya)
         {
             Debug.LogWarning("ShiftManager: Vardiya aktif değilken karar kaydedilemez.", this);
             return;
         }
+
+        if (itemSpawner == null || itemSpawner.CurrentSpawnedItem == null)
+        {
+            Debug.LogWarning("[ShiftNet] Aktif ag esyasi yok; karar yok sayildi.", this);
+            return;
+        }
+
+        ItemIdentity activeIdentity = itemSpawner.CurrentSpawnedItem.GetComponentInChildren<ItemIdentity>();
+        if (activeIdentity != null && activeIdentity.ItemId != itemId)
+        {
+            Debug.LogWarning($"[ShiftNet] Eski/farkli esya karari reddedildi. Gelen={itemId} Aktif={activeIdentity.ItemId}", this);
+            return;
+        }
+
+        if (lastDecisionItemId == itemId &&
+            lastDecisionCategory == chosen &&
+            Time.unscaledTime - lastDecisionTime < 0.75f)
+        {
+            Debug.Log("[ShiftNet] Yinelenen soket karari yok sayildi.", this);
+            return;
+        }
+
+        lastDecisionItemId = itemId;
+        lastDecisionCategory = chosen;
+        lastDecisionTime = Time.unscaledTime;
 
         bool isCorrect = correct == chosen;
         float safeInspectMs = Mathf.Max(0f, inspectMs);
@@ -175,7 +281,61 @@ public class ShiftManager : MonoBehaviour
         }
 
         OnDecision?.Invoke(result);
-        QueueNextItem();
+        BroadcastRemoteMethod(
+            nameof(ReceiveDecisionResult),
+            itemId,
+            (int)correct,
+            (int)chosen,
+            result.isCorrect,
+            result.inspectMs,
+            result.shakeCount,
+            result.explanation,
+            correctCount,
+            incorrectCount,
+            inspectedItemCount,
+            totalShakeCount);
+
+        ForceSync();
+
+        if (isCorrect)
+        {
+            itemSpawner.Despawn(itemSpawner.CurrentSpawnedItem);
+            QueueNextItem();
+        }
+    }
+
+    [SynchronizableMethod]
+    private void ReceiveDecisionResult(
+        int itemId,
+        int correct,
+        int chosen,
+        bool isCorrect,
+        float inspectMs,
+        int shakeCount,
+        string explanation,
+        int syncedCorrectCount,
+        int syncedIncorrectCount,
+        int syncedInspectedCount,
+        int syncedShakeCount)
+    {
+        if (IsHostAuthority)
+            return;
+
+        correctCount = syncedCorrectCount;
+        incorrectCount = syncedIncorrectCount;
+        inspectedItemCount = syncedInspectedCount;
+        totalShakeCount = syncedShakeCount;
+
+        OnDecision?.Invoke(new DecisionResult
+        {
+            itemId = itemId,
+            correct = (ItemCategory)correct,
+            chosen = (ItemCategory)chosen,
+            isCorrect = isCorrect,
+            inspectMs = inspectMs,
+            shakeCount = shakeCount,
+            explanation = explanation
+        });
     }
 
     /// <summary>
@@ -183,6 +343,9 @@ public class ShiftManager : MonoBehaviour
     /// </summary>
     public void EndShift()
     {
+        if (!IsHostAuthority)
+            return;
+
         if (State != ShiftState.Vardiya)
             return;
 
@@ -204,6 +367,45 @@ public class ShiftManager : MonoBehaviour
 
         LastReport = BuildReport();
         SetState(ShiftState.Rapor);
+        OnReportReady?.Invoke(LastReport);
+        BroadcastRemoteMethod(
+            nameof(ReceiveShiftReport),
+            LastReport.sessionId,
+            LastReport.correctCount,
+            LastReport.incorrectCount,
+            LastReport.inspectedItemCount,
+            LastReport.totalShakeCount,
+            LastReport.averageInspectMs,
+            LastReport.hasMostConfusedCategory,
+            (int)LastReport.mostConfusedCategory);
+        ForceSync();
+    }
+
+    [SynchronizableMethod]
+    private void ReceiveShiftReport(
+        int sessionId,
+        int reportCorrectCount,
+        int reportIncorrectCount,
+        int reportInspectedCount,
+        int reportShakeCount,
+        float averageInspectMs,
+        bool hasMostConfusedCategory,
+        int mostConfusedCategory)
+    {
+        if (IsHostAuthority)
+            return;
+
+        LastReport = new ShiftReport
+        {
+            sessionId = sessionId,
+            correctCount = reportCorrectCount,
+            incorrectCount = reportIncorrectCount,
+            inspectedItemCount = reportInspectedCount,
+            totalShakeCount = reportShakeCount,
+            averageInspectMs = averageInspectMs,
+            hasMostConfusedCategory = hasMostConfusedCategory,
+            mostConfusedCategory = (ItemCategory)mostConfusedCategory
+        };
         OnReportReady?.Invoke(LastReport);
     }
 
@@ -262,11 +464,12 @@ public class ShiftManager : MonoBehaviour
         if (State == newState)
             return;
 
-        State = newState;
-        OnStateChanged?.Invoke(State);
+        stateValue = (int)newState;
+        lastObservedState = newState;
+        OnStateChanged?.Invoke(newState);
     }
 
-    private void PublishTime()
+    private void PublishTime(bool sync = true)
     {
         int wholeSeconds = Mathf.CeilToInt(remainingSeconds);
         if (wholeSeconds == lastPublishedWholeSecond)
@@ -274,6 +477,9 @@ public class ShiftManager : MonoBehaviour
 
         lastPublishedWholeSecond = wholeSeconds;
         OnTimeChanged?.Invoke(remainingSeconds);
+
+        if (sync && IsHostAuthority)
+            ForceSync();
     }
 
     private ShiftReport BuildReport()

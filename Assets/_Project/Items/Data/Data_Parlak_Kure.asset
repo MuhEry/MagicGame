@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   id: 201
   displayName: Kure
-  category: 1
-  mass: 1
+  category: 2
+  mass: 10
   rattleClip: {fileID: 0}
   glowColor: {r: 4, g: 0, b: 0, a: 4}
