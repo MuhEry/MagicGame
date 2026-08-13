@@ -134,7 +134,8 @@ GameObject:
   - component: {fileID: 2725013225129076854}
   - component: {fileID: 6923397928622811899}
   - component: {fileID: 5929311764361685829}
-  - component: {fileID: 4885670391160185573}
+  - component: {fileID: 7632541265817602111}
+  - component: {fileID: 7632541265817602112}
   - component: {fileID: 4701872520462658507}
   - component: {fileID: 8730225123957424309}
   m_Layer: 0
@@ -345,7 +346,7 @@ MonoBehaviour:
   shakeThreshold: 0.05
   shakeCooldown: 0.5
   hapticMassMultiplier: 0.1
---- !u!114 &4885670391160185573
+--- !u!114 &7632541265817602111
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -354,9 +355,53 @@ MonoBehaviour:
   m_GameObject: {fileID: 7343967178458975054}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 649c525df6058fb4ba22032802414272, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemOwnership
+  m_Script: {fileID: 11500000, guid: de25291dc6047f44a9fa8bee8eabdbeb, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: com.alteruna.multiplayer::Alteruna.Multiplayer.Unity.RigidbodySynchronizable
+  Multiplayer: {fileID: 0}
+  _uidString: 5f97f52b-53ab-44ea-af0b-2e63eb90d71a
+  BucketBehaviors:
+  - Name: Min
+    NetLOD: 0
+    Frequency: -1
+  - Name: Low
+    NetLOD: 1
+    Frequency: 0
+  - Name: Mid
+    NetLOD: 2
+    Frequency: 0
+  - Name: High
+    NetLOD: 3
+    Frequency: 0
+  - Name: Max
+    NetLOD: 4
+    Frequency: 120
+  Reliability: 2
+  SyncEveryNUpdates: 2
+  FullSyncEveryNSync: 4
+  SendData: 1
+  ApplyAsTransform: 0
+  AllowCollisionToAssumeOwner: 0
+  Rigidbody: {fileID: 4327426184791769435}
+--- !u!114 &7632541265817602112
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7343967178458975054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2c9c3d9c1bf4f019d7e5d44fa19a13b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkGrabOwnership
+  Multiplayer: {fileID: 0}
+  _uidString: 56ed1332-d85e-41fd-a79a-e19ef7b5f40c
+  Reliability: 2
+  LocalMethodBehavior: 0
+  ForceSyncFields: 1
+  ForceSyncMethods: 0
+  holderIndex: -1
 --- !u!82 &4701872520462658507
 AudioSource:
   m_ObjectHideFlags: 0

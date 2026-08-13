@@ -76,6 +76,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Item_Agir_Kulp
       objectReference: {fileID: 0}
+    - target: {fileID: 7632541265817602112, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: _uidString
+      value: 8178257d-9023-4fc7-9af6-f6c547ff4004
+      objectReference: {fileID: 0}
     - target: {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
       propertyPath: m_Size.x
       value: 0.14
@@ -87,6 +91,10 @@ PrefabInstance:
     - target: {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
       propertyPath: m_Size.z
       value: 0.14
+      objectReference: {fileID: 0}
+    - target: {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

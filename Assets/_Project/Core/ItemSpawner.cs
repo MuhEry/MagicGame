@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AlterunaComponents;
 using UnityEngine;
 
 [Serializable]
@@ -27,6 +28,10 @@ public class ItemSpawner : MonoBehaviour
     [Header("Sahne")]
     [SerializeField] private Transform spawnPoint;
 
+    [Header("Ag")]
+    [SerializeField] private Alteruna.Multiplayer.Unity.Spawner networkSpawner;
+    [SerializeField] private AlterunaComponents.MultiplayerManager multiplayerManager;
+
     private readonly List<ItemSpawnEntry> spawnQueue = new List<ItemSpawnEntry>();
     private System.Random random;
     private int nextQueueIndex;
@@ -42,6 +47,16 @@ public class ItemSpawner : MonoBehaviour
 
     /// <summary>Bu vardiyada FIILEN kullanilan seed. Faz 2'de host bunu istemciye gonderir.</summary>
     public int Seed { get; private set; }
+
+    private void Awake()
+    {
+        if (networkSpawner == null)
+            networkSpawner = GetComponent<Alteruna.Multiplayer.Unity.Spawner>();
+        if (multiplayerManager == null)
+            multiplayerManager = FindFirstObjectByType<AlterunaComponents.MultiplayerManager>();
+
+        ConfigureNetworkSpawner();
+    }
 
     /// <summary>
     /// Vardiya BASLAMADAN once cagrilir. Faz 2'de host, istemcilerin ayni sirayi
@@ -63,6 +78,9 @@ public class ItemSpawner : MonoBehaviour
     /// </summary>
     public void BeginShift()
     {
+        if (!CanHostSpawn())
+            return;
+
         // seed 0 ise her vardiya farkli bir sira. UnityEngine.Random KULLANILMAZ
         // (mimari kural 4) - tohum Environment.TickCount'tan alinir, uretim yine
         // System.Random ile deterministiktir. Loglanan seed ile ayni tur tekrar oynatilabilir.
@@ -93,6 +111,9 @@ public class ItemSpawner : MonoBehaviour
 
     public GameObject SpawnNext()
     {
+        if (!CanHostSpawn())
+            return null;
+
         if (!IsSpawning)
         {
             Debug.LogWarning("ItemSpawner: Vardiya başlamadan eşya üretilemez.", this);
@@ -109,7 +130,17 @@ public class ItemSpawner : MonoBehaviour
         Transform point = spawnPoint != null ? spawnPoint : transform;
 
         // Projedeki Instantiate çağrısı yalnızca bu dosyada tutulur.
-        CurrentSpawnedItem = Instantiate(entry.prefab, point.position, point.rotation);
+        int prefabIndex = networkSpawner.SpawnableObjects.IndexOf(entry.prefab);
+        if (prefabIndex < 0)
+        {
+            Debug.LogError($"[ItemSpawner] Prefab Spawner listesinde yok: {entry.prefab.name}", this);
+            return null;
+        }
+
+        CurrentSpawnedItem = networkSpawner.Spawn(prefabIndex, point.position, point.rotation);
+        if (CurrentSpawnedItem == null)
+            return null;
+
         CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
         ItemSpawned?.Invoke(CurrentSpawnedItem);
@@ -120,5 +151,50 @@ public class ItemSpawner : MonoBehaviour
     public void StopSpawning()
     {
         IsSpawning = false;
+    }
+
+    public void Despawn(GameObject item)
+    {
+        if (item == null || !CanHostSpawn())
+            return;
+
+        networkSpawner.Despawn(item);
+        if (CurrentSpawnedItem == item)
+            CurrentSpawnedItem = null;
+    }
+
+    private void ConfigureNetworkSpawner()
+    {
+        if (networkSpawner == null)
+        {
+            Debug.LogError("[ItemSpawner] Alteruna Spawner bulunamadi.", this);
+            return;
+        }
+
+        networkSpawner.SpawnableObjects.Clear();
+        foreach (ItemSpawnEntry entry in itemPrefabs)
+        {
+            if (entry != null && entry.prefab != null)
+                networkSpawner.SpawnableObjects.Add(entry.prefab);
+        }
+
+        networkSpawner.ForceSync = true;
+    }
+
+    private bool CanHostSpawn()
+    {
+        if (networkSpawner == null || multiplayerManager == null)
+        {
+            Debug.LogWarning("[ItemSpawner] Ag bilesenleri hazir degil.", this);
+            return false;
+        }
+
+        if (!multiplayerManager.InRoom || !multiplayerManager.IsHost())
+        {
+            Debug.LogWarning("[ItemSpawner] Esyayi yalnizca LAN hostu uretebilir.", this);
+            return false;
+        }
+
+        return true;
     }
 }

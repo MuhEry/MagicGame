@@ -80,6 +80,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Item_Sesli_Kumbara
       objectReference: {fileID: 0}
+    - target: {fileID: 7632541265817602112, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: _uidString
+      value: 2c5422a9-d2ed-41c3-ad89-a1c66edd31a6
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
     m_RemovedGameObjects: []

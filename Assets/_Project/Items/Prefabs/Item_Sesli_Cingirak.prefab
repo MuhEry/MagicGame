@@ -76,6 +76,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Item_Sesli_Cingirak
       objectReference: {fileID: 0}
+    - target: {fileID: 7632541265817602112, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: _uidString
+      value: 24dd8884-0666-47aa-92fc-56b36fa52ff7
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
     m_RemovedGameObjects: []

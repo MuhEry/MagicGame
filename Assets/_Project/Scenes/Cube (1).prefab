@@ -14,8 +14,10 @@ GameObject:
   - component: {fileID: 2224807070131648456}
   - component: {fileID: 5303366606501171096}
   - component: {fileID: 6750390053795399826}
+  - component: {fileID: 6750390053795399827}
+  - component: {fileID: 6750390053795399828}
   m_Layer: 0
-  m_Name: Cube (1)
+  m_Name: TestCube
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -114,27 +116,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &5303366606501171096
-MonoBehaviour:
+--- !u!54 &5303366606501171096
+Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 929632191465105820}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 70c7b1bdd0a94feba5a5f3e28f3e8de1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: com.alteruna.multiplayer::AlterunaComponents.Avatar
-  Multiplayer: {fileID: 0}
-  IsPossessor: 0
-  IsPossessed: 0
-  OnPossessed:
-    m_PersistentCalls:
-      m_Calls: []
-  OnUnpossessed:
-    m_PersistentCalls:
-      m_Calls: []
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!114 &6750390053795399826
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -144,11 +152,33 @@ MonoBehaviour:
   m_GameObject: {fileID: 929632191465105820}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1d0700b1066e4a87bd9fb534b0ffff01, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: com.alteruna.multiplayer::Alteruna.Multiplayer.Unity.TransformSynchronizable
+  m_Script: {fileID: 11500000, guid: 0ad34abafad169848a38072baa96cdb2, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable
+  m_InteractionManager: {fileID: 0}
+  m_Colliders: []
+  m_InteractionLayers:
+    m_Bits: 1
+  m_SelectMode: 0
+  m_MovementType: 0
+  m_TrackPosition: 1
+  m_TrackRotation: 1
+  m_ThrowOnDetach: 1
+  m_AddDefaultGrabTransformers: 1
+--- !u!114 &6750390053795399827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 929632191465105820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de25291dc6047f44a9fa8bee8eabdbeb, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: com.alteruna.multiplayer::Alteruna.Multiplayer.Unity.RigidbodySynchronizable
   Multiplayer: {fileID: 0}
-  _uidString: af2c735e-2bfb-496f-80a1-c74495184f01
+  _uidString: 52b4cc75-1201-48b8-967f-46484af1f5b2
   BucketBehaviors:
   - Name: Min
     NetLOD: 0
@@ -166,7 +196,28 @@ MonoBehaviour:
     NetLOD: 4
     Frequency: 120
   Reliability: 2
-  UseGlobalPosition: 0
-  OnlySyncFromRoomOwner: 0
-  refreshRate: 30
-  SyncedAxes: 511
+  SyncEveryNUpdates: 2
+  FullSyncEveryNSync: 4
+  SendData: 1
+  ApplyAsTransform: 0
+  AllowCollisionToAssumeOwner: 0
+  Rigidbody: {fileID: 5303366606501171096}
+--- !u!114 &6750390053795399828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 929632191465105820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2c9c3d9c1bf4f019d7e5d44fa19a13b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkGrabOwnership
+  Multiplayer: {fileID: 0}
+  _uidString: c4f15dd5-a751-4972-baf0-27e7dce142b7
+  Reliability: 2
+  LocalMethodBehavior: 0
+  ForceSyncFields: 1
+  ForceSyncMethods: 0
+  holderIndex: -1

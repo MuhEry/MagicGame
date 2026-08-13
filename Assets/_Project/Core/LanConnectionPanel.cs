@@ -27,6 +27,7 @@ public sealed class LanConnectionPanel : MonoBehaviour
     private Button hostButton;
     private Button joinButton;
     private Button spawnButton;
+    private Button shiftButton;
     private float nextStatusRefresh;
     private string lastStateSnapshot;
     private int connectionAttempt;
@@ -222,6 +223,8 @@ public sealed class LanConnectionPanel : MonoBehaviour
             joinButton.interactable = canStartLan;
         if (spawnButton != null)
             spawnButton.interactable = inRoom && isHost;
+        if (shiftButton != null)
+            shiftButton.interactable = inRoom && isHost;
 
         string service = inRoom ? "OTURUMDA" : connecting ? "BAGLANIYOR" : serviceConnected ? "BAGLI" : "HAZIR";
         string role = inRoom ? (isHost ? "HOST" : "CLIENT") : "-";
@@ -635,10 +638,10 @@ public sealed class LanConnectionPanel : MonoBehaviour
             oldNetworkButton.SetActive(false);
 
         GameObject shiftButtonObject = GameObject.Find("Btn_YeniVardiya");
-        if (shiftButtonObject != null && shiftButtonObject.TryGetComponent(out Button shiftButton))
+        if (shiftButtonObject != null && shiftButtonObject.TryGetComponent(out shiftButton))
         {
             shiftButton.interactable = false;
-            Debug.Log("[LAN] Yerel Instantiate kullanan Yeni Vardiya butonu test icin kilitlendi.", shiftButtonObject);
+            Debug.Log("[LAN] Yeni Vardiya yalniz LAN hostuna acilacak.", shiftButtonObject);
         }
     }
 

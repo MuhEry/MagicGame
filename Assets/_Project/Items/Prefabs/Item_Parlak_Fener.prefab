@@ -60,6 +60,10 @@ PrefabInstance:
       propertyPath: m_Mass
       value: 1.5
       objectReference: {fileID: 0}
+    - target: {fileID: 4701872520462658507, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5221216079470404623, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.12
@@ -79,6 +83,10 @@ PrefabInstance:
     - target: {fileID: 7343967178458975054, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
       propertyPath: m_Name
       value: Item_Parlak_Fener
+      objectReference: {fileID: 0}
+    - target: {fileID: 7632541265817602112, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
+      propertyPath: _uidString
+      value: 3b367ad3-be4a-4f8f-8f04-6f4cffe5e239
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 8730225123957424309, guid: 32a04bfca76522d41a3b5c4336e6ce79, type: 3}
