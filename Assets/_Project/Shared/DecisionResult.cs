@@ -1,5 +1,6 @@
 public struct DecisionResult
 {
+    public int playerIndex;
     public int itemId;
     public ItemCategory correct;
     public ItemCategory chosen;

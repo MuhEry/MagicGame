@@ -28,16 +28,25 @@ public class ItemSpawner : MonoBehaviour
 
     [Header("Sahne")]
     [SerializeField] private Transform spawnPoint;
+    [SerializeField, Min(1)] private int maxConcurrentItems = 2;
+    [SerializeField, Min(0f)] private float spawnSpacing = 0.35f;
 
     [Header("Ag")]
     [SerializeField] private Alteruna.Multiplayer.Unity.Spawner networkSpawner;
     [SerializeField] private AlterunaComponents.MultiplayerManager multiplayerManager;
 
     private readonly List<ItemSpawnEntry> spawnQueue = new List<ItemSpawnEntry>();
+    private readonly Dictionary<GameObject, ActiveItem> activeItems =
+        new Dictionary<GameObject, ActiveItem>();
     private System.Random random;
     private int nextQueueIndex;
-    private ItemSpawnEntry currentEntry;
     private Coroutine resetRoutine;
+
+    private sealed class ActiveItem
+    {
+        public ItemSpawnEntry Entry;
+        public int Slot;
+    }
 
     /// <summary>
     /// Bacadan bir esya dustugu anda tetiklenir. Ses/isik gibi sunum efektleri
@@ -46,7 +55,21 @@ public class ItemSpawner : MonoBehaviour
     public event Action<GameObject> ItemSpawned;
 
     public bool IsSpawning { get; private set; }
-    public GameObject CurrentSpawnedItem { get; private set; }
+    public int ActiveItemCount => activeItems.Count;
+    public bool HasActiveItems => activeItems.Count > 0;
+    public GameObject CurrentSpawnedItem
+    {
+        get
+        {
+            foreach (GameObject item in activeItems.Keys)
+            {
+                if (item != null)
+                    return item;
+            }
+
+            return null;
+        }
+    }
 
     /// <summary>Bu vardiyada FIILEN kullanilan seed. Faz 2'de host bunu istemciye gonderir.</summary>
     public int Seed { get; private set; }
@@ -74,6 +97,9 @@ public class ItemSpawner : MonoBehaviour
     {
         if (spawnPoint == null)
             spawnPoint = transform;
+
+        maxConcurrentItems = Mathf.Max(1, maxConcurrentItems);
+        spawnSpacing = Mathf.Max(0f, spawnSpacing);
     }
 
     /// <summary>
@@ -121,9 +147,9 @@ public class ItemSpawner : MonoBehaviour
         if (!CanHostSpawn())
             return null;
 
-        if (CurrentSpawnedItem != null)
+        if (activeItems.Count >= maxConcurrentItems)
         {
-            Debug.LogWarning("[ItemSpawner] Aktif esya varken yenisi uretilmedi.", this);
+            Debug.LogWarning("[ItemSpawner] Iki aktif esya yuvasi da dolu.", this);
             return CurrentSpawnedItem;
         }
 
@@ -147,10 +173,19 @@ public class ItemSpawner : MonoBehaviour
         }
 
         ItemSpawnEntry entry = spawnQueue[nextQueueIndex++];
-        return SpawnEntry(entry);
+        return SpawnEntry(entry, FindFreeSlot());
     }
 
-    private GameObject SpawnEntry(ItemSpawnEntry entry)
+    public void FillSpawnSlots()
+    {
+        while (IsSpawning && activeItems.Count < maxConcurrentItems)
+        {
+            if (SpawnNext() == null)
+                break;
+        }
+    }
+
+    private GameObject SpawnEntry(ItemSpawnEntry entry, int slot)
     {
         Transform point = spawnPoint != null ? spawnPoint : transform;
 
@@ -162,16 +197,18 @@ public class ItemSpawner : MonoBehaviour
             return null;
         }
 
-        CurrentSpawnedItem = networkSpawner.Spawn(prefabIndex, point.position, point.rotation);
-        if (CurrentSpawnedItem == null)
+        float centeredSlot = slot - (maxConcurrentItems - 1) * 0.5f;
+        Vector3 position = point.position + point.right * (centeredSlot * spawnSpacing);
+        GameObject spawnedItem = networkSpawner.Spawn(prefabIndex, position, point.rotation);
+        if (spawnedItem == null)
             return null;
 
-        currentEntry = entry;
-        CurrentSpawnedItem.name = entry.prefab.name + "_" + entry.itemId;
+        activeItems[spawnedItem] = new ActiveItem { Entry = entry, Slot = slot };
+        spawnedItem.name = entry.prefab.name + "_" + entry.itemId;
 
-        ItemSpawned?.Invoke(CurrentSpawnedItem);
+        ItemSpawned?.Invoke(spawnedItem);
 
-        return CurrentSpawnedItem;
+        return spawnedItem;
     }
 
     public void StopSpawning()
@@ -179,17 +216,49 @@ public class ItemSpawner : MonoBehaviour
         IsSpawning = false;
     }
 
+    public void EndShift()
+    {
+        IsSpawning = false;
+
+        if (resetRoutine != null)
+        {
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
+        }
+
+        if (!CanHostSpawn())
+            return;
+
+        CleanupSpawnedItems();
+        Debug.Log("[ItemSpawner] Vardiya bitti; kalan ag esyalari temizlendi.", this);
+    }
+
     public void Despawn(GameObject item)
     {
         if (item == null || !CanHostSpawn())
             return;
 
+        activeItems.Remove(item);
         networkSpawner.Despawn(item);
-        if (CurrentSpawnedItem == item)
+    }
+
+    public bool TryGetSpawnedItem(int itemId, out GameObject item)
+    {
+        foreach (GameObject candidate in activeItems.Keys)
         {
-            CurrentSpawnedItem = null;
-            currentEntry = null;
+            if (candidate == null)
+                continue;
+
+            ItemIdentity identity = candidate.GetComponentInChildren<ItemIdentity>();
+            if (identity != null && identity.ItemId == itemId)
+            {
+                item = candidate;
+                return true;
+            }
         }
+
+        item = null;
+        return false;
     }
 
     public void ResetCurrentItem()
@@ -197,27 +266,35 @@ public class ItemSpawner : MonoBehaviour
         if (!CanHostSpawn() || resetRoutine != null)
             return;
 
-        if (CurrentSpawnedItem == null || currentEntry == null)
+        if (activeItems.Count == 0)
         {
-            Debug.LogWarning("[ItemSpawner] Sifirlanacak aktif esya yok.", this);
+            Debug.LogWarning("[ItemSpawner] Geri getirilecek aktif esya yok.", this);
             return;
         }
 
-        resetRoutine = StartCoroutine(ResetCurrentItemRoutine(currentEntry));
+        resetRoutine = StartCoroutine(ResetCurrentItemsRoutine());
     }
 
-    private IEnumerator ResetCurrentItemRoutine(ItemSpawnEntry entry)
+    private IEnumerator ResetCurrentItemsRoutine()
     {
-        networkSpawner.Despawn(CurrentSpawnedItem);
-        CurrentSpawnedItem = null;
-        currentEntry = null;
+        var itemsToRestore = new List<ActiveItem>(activeItems.Values);
+        var itemsToDespawn = new List<GameObject>(activeItems.Keys);
+        activeItems.Clear();
+
+        foreach (GameObject item in itemsToDespawn)
+        {
+            if (item != null)
+                networkSpawner.Despawn(item);
+        }
 
         yield return new WaitForSecondsRealtime(0.2f);
 
         if (IsSpawning && CanHostSpawn())
         {
-            SpawnEntry(entry);
-            Debug.Log($"[ItemSpawner] Esya bacada sifirlandi: {entry.prefab.name}", this);
+            foreach (ActiveItem item in itemsToRestore)
+                SpawnEntry(item.Entry, item.Slot);
+
+            Debug.Log($"[ItemSpawner] {itemsToRestore.Count} esya bacaya geri getirildi.", this);
         }
 
         resetRoutine = null;
@@ -235,8 +312,7 @@ public class ItemSpawner : MonoBehaviour
         foreach (GameObject item in spawned)
             networkSpawner.Despawn(item);
 
-        CurrentSpawnedItem = null;
-        currentEntry = null;
+        activeItems.Clear();
 
         if (spawned.Count > 0)
             Debug.Log($"[ItemSpawner] Yeni vardiya oncesi {spawned.Count} eski ag esyasi temizlendi.", this);
@@ -249,6 +325,27 @@ public class ItemSpawner : MonoBehaviour
             int swapIndex = random.Next(index + 1);
             (spawnQueue[index], spawnQueue[swapIndex]) = (spawnQueue[swapIndex], spawnQueue[index]);
         }
+    }
+
+    private int FindFreeSlot()
+    {
+        for (int slot = 0; slot < maxConcurrentItems; slot++)
+        {
+            bool occupied = false;
+            foreach (ActiveItem item in activeItems.Values)
+            {
+                if (item.Slot == slot)
+                {
+                    occupied = true;
+                    break;
+                }
+            }
+
+            if (!occupied)
+                return slot;
+        }
+
+        return 0;
     }
 
     private void ConfigureNetworkSpawner()

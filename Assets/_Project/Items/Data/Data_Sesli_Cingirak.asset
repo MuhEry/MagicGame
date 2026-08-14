@@ -16,5 +16,5 @@ MonoBehaviour:
   displayName: Cingirak
   category: 0
   mass: 1
-  rattleClip: {fileID: 8300000, guid: 16fba6d30ed741d4a9fdd6e79ee2f3ac, type: 3}
+  rattleClip: {fileID: 8300000, guid: 53f10d1ea87d1f649ab2dd48494bfb4a, type: 3}
   glowColor: {r: 0, g: 0.0065722456, b: 0.6754716, a: 1}

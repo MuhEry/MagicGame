@@ -189,12 +189,34 @@ public class CategorySocket : XRSocketInteractor
 
         if (m_ShiftManager != null && m_ShiftManager.State == ShiftState.Vardiya)
         {
+            var ownership = interactable.transform.GetComponentInParent<NetworkGrabOwnership>();
+            int playerIndex;
+            if (ownership != null)
+            {
+                playerIndex = ownership.LastInteractorIndex;
+                if (playerIndex < 0)
+                {
+                    StartCoroutine(SubmitDecisionWhenOwnerKnown(
+                        ownership,
+                        itemId,
+                        itemCategory,
+                        inspectMs,
+                        shakeCount));
+                    return;
+                }
+            }
+            else
+            {
+                playerIndex = m_ShiftManager.LocalPlayerIndex;
+            }
+
             m_ShiftManager.RegisterDecision(
                 itemId,
                 itemCategory,
                 m_AcceptedCategory,
                 inspectMs,
-                shakeCount);
+                shakeCount,
+                playerIndex);
         }
 
         Debug.Log(
@@ -204,6 +226,34 @@ public class CategorySocket : XRSocketInteractor
             this);
 
         // Karar ve fizik hostta uygulanir. Her cihaz geri bildirimi OnDecision ile yerel oynatir.
+    }
+
+    IEnumerator SubmitDecisionWhenOwnerKnown(
+        NetworkGrabOwnership ownership,
+        int itemId,
+        ItemCategory itemCategory,
+        float inspectMs,
+        int shakeCount)
+    {
+        float timeout = Time.unscaledTime + 0.5f;
+        while (ownership != null && ownership.LastInteractorIndex < 0 &&
+               Time.unscaledTime < timeout)
+            yield return null;
+
+        if (ownership == null || ownership.LastInteractorIndex < 0 ||
+            m_ShiftManager == null || m_ShiftManager.State != ShiftState.Vardiya)
+        {
+            Debug.LogWarning("[CategorySocket] Esyayi yerlestiren oyuncu belirlenemedi; karar yok sayildi.", this);
+            yield break;
+        }
+
+        m_ShiftManager.RegisterDecision(
+            itemId,
+            itemCategory,
+            m_AcceptedCategory,
+            inspectMs,
+            shakeCount,
+            ownership.LastInteractorIndex);
     }
 
     /// <inheritdoc />
@@ -272,7 +322,9 @@ public class CategorySocket : XRSocketInteractor
 
         if (!result.isCorrect && m_ShiftManager.IsHostAuthority && m_RejectRoutine == null)
         {
-            var item = FindFirstObjectByType<ItemSpawner>()?.CurrentSpawnedItem;
+            var spawner = FindFirstObjectByType<ItemSpawner>();
+            GameObject item = null;
+            spawner?.TryGetSpawnedItem(result.itemId, out item);
             var interactable = item != null ? item.GetComponentInChildren<XRGrabInteractable>() : null;
             if (interactable != null)
                 m_RejectRoutine = StartCoroutine(RejectRoutine(interactable));
@@ -327,10 +379,14 @@ public class CategorySocket : XRSocketInteractor
                 if (sync.HasOwnership)
                 {
                     sync.isKinematic = false;
+                    sync.useGravity = true;
+                    sync.velocity = Vector3.zero;
+                    sync.angularVelocity = Vector3.zero;
                     sync.SyncSettings();
                     sync.AddForce(GetEjectDirection() * m_EjectSpeed, ForceMode.VelocityChange);
                     sync.ForceUpdate(true);
                     yield return new WaitForFixedUpdate();
+                    sync.ForceUpdate(true);
                     sync.ReleaseOwnership();
                 }
                 else

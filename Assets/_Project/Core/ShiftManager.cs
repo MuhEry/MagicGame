@@ -22,6 +22,21 @@ public struct ShiftReport
     public float averageInspectMs;
     public bool hasMostConfusedCategory;
     public ItemCategory mostConfusedCategory;
+    public int player0Correct;
+    public int player0Incorrect;
+    public int player0Score;
+    public int player0ShiftWins;
+    public float player0AverageInspectMs;
+    public bool player0HasMostConfusedCategory;
+    public ItemCategory player0MostConfusedCategory;
+    public int player1Correct;
+    public int player1Incorrect;
+    public int player1Score;
+    public int player1ShiftWins;
+    public float player1AverageInspectMs;
+    public bool player1HasMostConfusedCategory;
+    public ItemCategory player1MostConfusedCategory;
+    public int winnerIndex;
 }
 
 public class ShiftManager : AttributesSync
@@ -40,11 +55,17 @@ public class ShiftManager : AttributesSync
 
     private readonly Dictionary<ItemCategory, int> incorrectByCategory =
         new Dictionary<ItemCategory, int>();
+    private readonly Dictionary<ItemCategory, int> player0IncorrectByCategory =
+        new Dictionary<ItemCategory, int>();
+    private readonly Dictionary<ItemCategory, int> player1IncorrectByCategory =
+        new Dictionary<ItemCategory, int>();
 
     private Coroutine timerRoutine;
     private Coroutine nextItemRoutine;
     [SynchronizableField] private float remainingSeconds;
     private float totalInspectMs;
+    private float player0TotalInspectMs;
+    private float player1TotalInspectMs;
     [SynchronizableField] private int correctCount;
     [SynchronizableField] private int incorrectCount;
     [SynchronizableField] private int inspectedItemCount;
@@ -52,10 +73,17 @@ public class ShiftManager : AttributesSync
     [SynchronizableField] private int currentSessionId;
     [SynchronizableField] private int stateValue;
     [SynchronizableField] private int shiftSeed;
+    [SynchronizableField] private int player0Correct;
+    [SynchronizableField] private int player0Incorrect;
+    [SynchronizableField] private int player1Correct;
+    [SynchronizableField] private int player1Incorrect;
+    [SynchronizableField] private int player0ShiftWins;
+    [SynchronizableField] private int player1ShiftWins;
     private int lastPublishedWholeSecond = -1;
     private ShiftState lastObservedState = ShiftState.Hazir;
     private int lastDecisionItemId = -1;
     private ItemCategory lastDecisionCategory;
+    private int lastDecisionPlayerIndex = -1;
     private float lastDecisionTime = float.NegativeInfinity;
 
     public ShiftState State => (ShiftState)stateValue;
@@ -65,9 +93,18 @@ public class ShiftManager : AttributesSync
     public int IncorrectCount => incorrectCount;
     public int InspectedItemCount => inspectedItemCount;
     public int TotalShakeCount => totalShakeCount;
-    public int Score => correctCount;
+    public int Score => correctCount - incorrectCount;
     public ShiftReport LastReport { get; private set; }
     public bool IsHostAuthority => Multiplayer != null && Multiplayer.InRoom && Multiplayer.IsHost();
+    public int LocalPlayerIndex => Multiplayer != null && Multiplayer.InRoom ? Multiplayer.Me.Index : -1;
+    public int Player0Correct => player0Correct;
+    public int Player0Incorrect => player0Incorrect;
+    public int Player0Score => player0Correct - player0Incorrect;
+    public int Player0ShiftWins => player0ShiftWins;
+    public int Player1Correct => player1Correct;
+    public int Player1Incorrect => player1Incorrect;
+    public int Player1Score => player1Correct - player1Incorrect;
+    public int Player1ShiftWins => player1ShiftWins;
 
     private void Awake()
     {
@@ -139,8 +176,16 @@ public class ShiftManager : AttributesSync
         incorrectCount = 0;
         inspectedItemCount = 0;
         totalShakeCount = 0;
+        player0Correct = 0;
+        player0Incorrect = 0;
+        player1Correct = 0;
+        player1Incorrect = 0;
         totalInspectMs = 0f;
+        player0TotalInspectMs = 0f;
+        player1TotalInspectMs = 0f;
         incorrectByCategory.Clear();
+        player0IncorrectByCategory.Clear();
+        player1IncorrectByCategory.Clear();
         LastReport = default;
 
         SetState(ShiftState.Vardiya);
@@ -157,7 +202,7 @@ public class ShiftManager : AttributesSync
         {
             itemSpawner.BeginShift();
             shiftSeed = itemSpawner.Seed;
-            itemSpawner.SpawnNext();
+            itemSpawner.FillSpawnSlots();
         }
 
         ForceSync();
@@ -172,8 +217,12 @@ public class ShiftManager : AttributesSync
         ItemCategory correct,
         ItemCategory chosen,
         float inspectMs,
-        int shakeCount)
+        int shakeCount,
+        int playerIndex = -1)
     {
+        if (playerIndex < 0)
+            playerIndex = LocalPlayerIndex;
+
         if (!IsHostAuthority)
         {
             if (Multiplayer == null || !Multiplayer.InRoom)
@@ -188,11 +237,12 @@ public class ShiftManager : AttributesSync
                 (int)correct,
                 (int)chosen,
                 inspectMs,
-                shakeCount);
+                shakeCount,
+                playerIndex);
             return;
         }
 
-        ApplyHostDecision(itemId, correct, chosen, inspectMs, shakeCount);
+        ApplyHostDecision(itemId, correct, chosen, inspectMs, shakeCount, playerIndex);
     }
 
     [SynchronizableMethod]
@@ -201,7 +251,8 @@ public class ShiftManager : AttributesSync
         int correct,
         int chosen,
         float inspectMs,
-        int shakeCount)
+        int shakeCount,
+        int playerIndex)
     {
         if (!IsHostAuthority)
             return;
@@ -211,7 +262,8 @@ public class ShiftManager : AttributesSync
             (ItemCategory)correct,
             (ItemCategory)chosen,
             inspectMs,
-            shakeCount);
+            shakeCount,
+            playerIndex);
     }
 
     private void ApplyHostDecision(
@@ -219,7 +271,8 @@ public class ShiftManager : AttributesSync
         ItemCategory correct,
         ItemCategory chosen,
         float inspectMs,
-        int shakeCount)
+        int shakeCount,
+        int playerIndex)
     {
         if (State != ShiftState.Vardiya)
         {
@@ -227,21 +280,21 @@ public class ShiftManager : AttributesSync
             return;
         }
 
-        if (itemSpawner == null || itemSpawner.CurrentSpawnedItem == null)
+        if (playerIndex < 0 || playerIndex > 1)
         {
-            Debug.LogWarning("[ShiftNet] Aktif ag esyasi yok; karar yok sayildi.", this);
+            Debug.LogWarning($"[ShiftNet] Gecersiz oyuncu indexi: {playerIndex}", this);
             return;
         }
 
-        ItemIdentity activeIdentity = itemSpawner.CurrentSpawnedItem.GetComponentInChildren<ItemIdentity>();
-        if (activeIdentity != null && activeIdentity.ItemId != itemId)
+        if (itemSpawner == null || !itemSpawner.TryGetSpawnedItem(itemId, out GameObject activeItem))
         {
-            Debug.LogWarning($"[ShiftNet] Eski/farkli esya karari reddedildi. Gelen={itemId} Aktif={activeIdentity.ItemId}", this);
+            Debug.LogWarning($"[ShiftNet] Aktif ag esyasi bulunamadi. Item={itemId}", this);
             return;
         }
 
         if (lastDecisionItemId == itemId &&
             lastDecisionCategory == chosen &&
+            lastDecisionPlayerIndex == playerIndex &&
             Time.unscaledTime - lastDecisionTime < 0.75f)
         {
             Debug.Log("[ShiftNet] Yinelenen soket karari yok sayildi.", this);
@@ -250,6 +303,7 @@ public class ShiftManager : AttributesSync
 
         lastDecisionItemId = itemId;
         lastDecisionCategory = chosen;
+        lastDecisionPlayerIndex = playerIndex;
         lastDecisionTime = Time.unscaledTime;
 
         bool isCorrect = correct == chosen;
@@ -257,6 +311,7 @@ public class ShiftManager : AttributesSync
 
         DecisionResult result = new DecisionResult
         {
+            playerIndex = playerIndex,
             itemId = itemId,
             correct = correct,
             chosen = chosen,
@@ -269,15 +324,22 @@ public class ShiftManager : AttributesSync
         inspectedItemCount++;
         totalInspectMs += safeInspectMs;
         totalShakeCount += result.shakeCount;
+        if (playerIndex == 0) player0TotalInspectMs += safeInspectMs;
+        else player1TotalInspectMs += safeInspectMs;
 
         if (isCorrect)
         {
             correctCount++;
+            if (playerIndex == 0) player0Correct++; else player1Correct++;
         }
         else
         {
             incorrectCount++;
+            if (playerIndex == 0) player0Incorrect++; else player1Incorrect++;
             incorrectByCategory[correct] = GetIncorrectCount(correct) + 1;
+            Dictionary<ItemCategory, int> playerMistakes =
+                playerIndex == 0 ? player0IncorrectByCategory : player1IncorrectByCategory;
+            playerMistakes[correct] = GetIncorrectCount(playerMistakes, correct) + 1;
         }
 
         OnDecision?.Invoke(result);
@@ -290,16 +352,17 @@ public class ShiftManager : AttributesSync
             result.inspectMs,
             result.shakeCount,
             result.explanation,
-            correctCount,
-            incorrectCount,
-            inspectedItemCount,
-            totalShakeCount);
+            playerIndex,
+            player0Correct,
+            player0Incorrect,
+            player1Correct,
+            player1Incorrect);
 
         ForceSync();
 
         if (isCorrect)
         {
-            itemSpawner.Despawn(itemSpawner.CurrentSpawnedItem);
+            itemSpawner.Despawn(activeItem);
             QueueNextItem();
         }
     }
@@ -313,21 +376,26 @@ public class ShiftManager : AttributesSync
         float inspectMs,
         int shakeCount,
         string explanation,
-        int syncedCorrectCount,
-        int syncedIncorrectCount,
-        int syncedInspectedCount,
-        int syncedShakeCount)
+        int playerIndex,
+        int syncedPlayer0Correct,
+        int syncedPlayer0Incorrect,
+        int syncedPlayer1Correct,
+        int syncedPlayer1Incorrect)
     {
         if (IsHostAuthority)
             return;
 
-        correctCount = syncedCorrectCount;
-        incorrectCount = syncedIncorrectCount;
-        inspectedItemCount = syncedInspectedCount;
-        totalShakeCount = syncedShakeCount;
+        player0Correct = syncedPlayer0Correct;
+        player0Incorrect = syncedPlayer0Incorrect;
+        player1Correct = syncedPlayer1Correct;
+        player1Incorrect = syncedPlayer1Incorrect;
+        correctCount = player0Correct + player1Correct;
+        incorrectCount = player0Incorrect + player1Incorrect;
+        inspectedItemCount = correctCount + incorrectCount;
 
         OnDecision?.Invoke(new DecisionResult
         {
+            playerIndex = playerIndex,
             itemId = itemId,
             correct = (ItemCategory)correct,
             chosen = (ItemCategory)chosen,
@@ -363,7 +431,13 @@ public class ShiftManager : AttributesSync
 
         remainingSeconds = 0f;
         PublishTime();
-        itemSpawner?.StopSpawning();
+        itemSpawner?.EndShift();
+
+        int winnerIndex = GetWinnerIndex();
+        if (winnerIndex == 0)
+            player0ShiftWins++;
+        else if (winnerIndex == 1)
+            player1ShiftWins++;
 
         LastReport = BuildReport();
         SetState(ShiftState.Rapor);
@@ -377,7 +451,20 @@ public class ShiftManager : AttributesSync
             LastReport.totalShakeCount,
             LastReport.averageInspectMs,
             LastReport.hasMostConfusedCategory,
-            (int)LastReport.mostConfusedCategory);
+            (int)LastReport.mostConfusedCategory,
+            LastReport.player0Correct,
+            LastReport.player0Incorrect,
+            LastReport.player0ShiftWins,
+            LastReport.player0AverageInspectMs,
+            LastReport.player0HasMostConfusedCategory,
+            (int)LastReport.player0MostConfusedCategory,
+            LastReport.player1Correct,
+            LastReport.player1Incorrect,
+            LastReport.player1ShiftWins,
+            LastReport.player1AverageInspectMs,
+            LastReport.player1HasMostConfusedCategory,
+            (int)LastReport.player1MostConfusedCategory,
+            LastReport.winnerIndex);
         ForceSync();
     }
 
@@ -390,7 +477,20 @@ public class ShiftManager : AttributesSync
         int reportShakeCount,
         float averageInspectMs,
         bool hasMostConfusedCategory,
-        int mostConfusedCategory)
+        int mostConfusedCategory,
+        int reportPlayer0Correct,
+        int reportPlayer0Incorrect,
+        int reportPlayer0ShiftWins,
+        float reportPlayer0AverageInspectMs,
+        bool reportPlayer0HasMostConfusedCategory,
+        int reportPlayer0MostConfusedCategory,
+        int reportPlayer1Correct,
+        int reportPlayer1Incorrect,
+        int reportPlayer1ShiftWins,
+        float reportPlayer1AverageInspectMs,
+        bool reportPlayer1HasMostConfusedCategory,
+        int reportPlayer1MostConfusedCategory,
+        int winnerIndex)
     {
         if (IsHostAuthority)
             return;
@@ -404,8 +504,33 @@ public class ShiftManager : AttributesSync
             totalShakeCount = reportShakeCount,
             averageInspectMs = averageInspectMs,
             hasMostConfusedCategory = hasMostConfusedCategory,
-            mostConfusedCategory = (ItemCategory)mostConfusedCategory
+            mostConfusedCategory = (ItemCategory)mostConfusedCategory,
+            player0Correct = reportPlayer0Correct,
+            player0Incorrect = reportPlayer0Incorrect,
+            player0Score = reportPlayer0Correct - reportPlayer0Incorrect,
+            player0ShiftWins = reportPlayer0ShiftWins,
+            player0AverageInspectMs = reportPlayer0AverageInspectMs,
+            player0HasMostConfusedCategory = reportPlayer0HasMostConfusedCategory,
+            player0MostConfusedCategory = (ItemCategory)reportPlayer0MostConfusedCategory,
+            player1Correct = reportPlayer1Correct,
+            player1Incorrect = reportPlayer1Incorrect,
+            player1Score = reportPlayer1Correct - reportPlayer1Incorrect,
+            player1ShiftWins = reportPlayer1ShiftWins,
+            player1AverageInspectMs = reportPlayer1AverageInspectMs,
+            player1HasMostConfusedCategory = reportPlayer1HasMostConfusedCategory,
+            player1MostConfusedCategory = (ItemCategory)reportPlayer1MostConfusedCategory,
+            winnerIndex = winnerIndex
         };
+        player0Correct = reportPlayer0Correct;
+        player0Incorrect = reportPlayer0Incorrect;
+        player0ShiftWins = reportPlayer0ShiftWins;
+        player1Correct = reportPlayer1Correct;
+        player1Incorrect = reportPlayer1Incorrect;
+        player1ShiftWins = reportPlayer1ShiftWins;
+        correctCount = reportCorrectCount;
+        incorrectCount = reportIncorrectCount;
+        inspectedItemCount = reportInspectedCount;
+        totalShakeCount = reportShakeCount;
         OnReportReady?.Invoke(LastReport);
     }
 
@@ -439,7 +564,7 @@ public class ShiftManager : AttributesSync
             yield return new WaitForSeconds(nextItemDelaySeconds);
 
         if (State == ShiftState.Vardiya)
-            itemSpawner.SpawnNext();
+            itemSpawner.FillSpawnSlots();
 
         nextItemRoutine = null;
     }
@@ -484,6 +609,11 @@ public class ShiftManager : AttributesSync
 
     private ShiftReport BuildReport()
     {
+        bool player0HasConfused = TryGetMostConfusedCategory(
+            player0IncorrectByCategory, out ItemCategory player0Confused);
+        bool player1HasConfused = TryGetMostConfusedCategory(
+            player1IncorrectByCategory, out ItemCategory player1Confused);
+
         ShiftReport report = new ShiftReport
         {
             sessionId = currentSessionId,
@@ -493,7 +623,24 @@ public class ShiftManager : AttributesSync
             totalShakeCount = totalShakeCount,
             averageInspectMs = inspectedItemCount == 0
                 ? 0f
-                : totalInspectMs / inspectedItemCount
+                : totalInspectMs / inspectedItemCount,
+            player0Correct = player0Correct,
+            player0Incorrect = player0Incorrect,
+            player0Score = Player0Score,
+            player0ShiftWins = player0ShiftWins,
+            player0AverageInspectMs = GetPlayerAverageInspectMs(
+                player0TotalInspectMs, player0Correct, player0Incorrect),
+            player0HasMostConfusedCategory = player0HasConfused,
+            player0MostConfusedCategory = player0Confused,
+            player1Correct = player1Correct,
+            player1Incorrect = player1Incorrect,
+            player1Score = Player1Score,
+            player1ShiftWins = player1ShiftWins,
+            player1AverageInspectMs = GetPlayerAverageInspectMs(
+                player1TotalInspectMs, player1Correct, player1Incorrect),
+            player1HasMostConfusedCategory = player1HasConfused,
+            player1MostConfusedCategory = player1Confused,
+            winnerIndex = GetWinnerIndex()
         };
 
         int highestIncorrectCount = 0;
@@ -510,9 +657,46 @@ public class ShiftManager : AttributesSync
         return report;
     }
 
+    private int GetWinnerIndex()
+    {
+        if (Player0Score == Player1Score)
+            return -1;
+
+        return Player0Score > Player1Score ? 0 : 1;
+    }
+
     private int GetIncorrectCount(ItemCategory category)
     {
         return incorrectByCategory.TryGetValue(category, out int count) ? count : 0;
+    }
+
+    private static int GetIncorrectCount(
+        Dictionary<ItemCategory, int> mistakes, ItemCategory category)
+    {
+        return mistakes.TryGetValue(category, out int count) ? count : 0;
+    }
+
+    private static float GetPlayerAverageInspectMs(float totalMs, int correct, int incorrect)
+    {
+        int decisionCount = correct + incorrect;
+        return decisionCount == 0 ? 0f : totalMs / decisionCount;
+    }
+
+    private static bool TryGetMostConfusedCategory(
+        Dictionary<ItemCategory, int> mistakes, out ItemCategory category)
+    {
+        category = default;
+        int highestCount = 0;
+        foreach (KeyValuePair<ItemCategory, int> pair in mistakes)
+        {
+            if (pair.Value <= highestCount)
+                continue;
+
+            highestCount = pair.Value;
+            category = pair.Key;
+        }
+
+        return highestCount > 0;
     }
 
     private static string BuildExplanation(ItemCategory correctCategory, bool isCorrect)

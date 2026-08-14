@@ -10,7 +10,7 @@ using UnityEngine;
 public class TelemetryLogger : MonoBehaviour
 {
     private const string Header =
-        "zaman_damgasi,oturum_id,esya_id,dogru_kategori,secilen_kategori,dogru_mu,inceleme_suresi_ms,sallama_sayisi";
+        "zaman_damgasi,oturum_id,oyuncu_index,esya_id,dogru_kategori,secilen_kategori,dogru_mu,inceleme_suresi_ms,sallama_sayisi";
 
     [SerializeField] private ShiftManager shiftManager;
 
@@ -87,6 +87,7 @@ public class TelemetryLogger : MonoBehaviour
             int sessionId = shiftManager != null ? shiftManager.CurrentSessionId : 0;
             output.Append(Escape(DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture))).Append(',');
             output.Append(sessionId).Append(',');
+            output.Append(result.playerIndex).Append(',');
             output.Append(result.itemId).Append(',');
             output.Append(Escape(result.correct.ToString())).Append(',');
             output.Append(Escape(result.chosen.ToString())).Append(',');

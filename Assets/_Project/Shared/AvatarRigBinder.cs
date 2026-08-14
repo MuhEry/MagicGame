@@ -77,6 +77,12 @@ public sealed class AvatarRigBinder : MonoBehaviour
                 return;
         }
 
+        Transform trackingOrigin = playerRefs.TrackingOriginTransform;
+        float yaw = trackingOrigin.eulerAngles.y;
+        transform.SetPositionAndRotation(
+            trackingOrigin.position,
+            Quaternion.Euler(0f, yaw, 0f));
+
         ApplyTrackedPose(head, playerRefs.HeadTransform);
         ApplyTrackedPose(handL, playerRefs.LeftHandTransform);
         ApplyTrackedPose(handR, playerRefs.RightHandTransform);

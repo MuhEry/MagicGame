@@ -20,13 +20,12 @@ using UnityEngine.UI;
 public sealed class LanConnectionPanel : MonoBehaviour
 {
     [SerializeField] private MultiplayerManager multiplayerManager;
-    [SerializeField] private NetworkTestSpawner networkTestSpawner;
     [SerializeField] private Canvas targetCanvas;
+    [SerializeField] private GameObject panelPrefab;
 
     private TMP_Text statusText;
     private Button hostButton;
     private Button joinButton;
-    private Button spawnButton;
     private Button shiftButton;
     private Button resetItemButton;
     private ItemSpawner itemSpawner;
@@ -51,9 +50,6 @@ public sealed class LanConnectionPanel : MonoBehaviour
     {
         if (multiplayerManager == null)
             multiplayerManager = GetComponent<MultiplayerManager>();
-
-        if (networkTestSpawner == null)
-            networkTestSpawner = GetComponent<NetworkTestSpawner>();
 
         itemSpawner = FindFirstObjectByType<ItemSpawner>();
 
@@ -156,18 +152,6 @@ public sealed class LanConnectionPanel : MonoBehaviour
         RunConnectionAction("JOIN", "LAN host otomatik araniyor...", () => { });
     }
 
-    public void SpawnTestObject()
-    {
-        if (networkTestSpawner == null)
-        {
-            SetStatus("NetworkTestSpawner bulunamadi.");
-            Debug.LogError("[LAN] NetworkTestSpawner bulunamadi.", this);
-            return;
-        }
-
-        networkTestSpawner.SpawnTestObject();
-    }
-
     public void ResetCurrentItem()
     {
         if (itemSpawner == null)
@@ -240,8 +224,6 @@ public sealed class LanConnectionPanel : MonoBehaviour
             hostButton.interactable = canStartLan;
         if (joinButton != null)
             joinButton.interactable = canStartLan;
-        if (spawnButton != null)
-            spawnButton.interactable = inRoom && isHost;
         if (shiftButton != null)
             shiftButton.interactable = inRoom && isHost;
         if (resetItemButton != null)
@@ -251,7 +233,7 @@ public sealed class LanConnectionPanel : MonoBehaviour
         string role = inRoom ? (isHost ? "HOST" : "CLIENT") : "-";
         string state = multiplayerManager.State.ToString();
         string room = inRoom ? "EVET" : "HAYIR";
-        SetStatus($"Servis: {service} | Durum: {state}\nRol: {role} | Oda: {room}\n{lanProbeStatus}");
+        SetStatus($"Servis: {service} | Durum: {state}\nRol: {role} | Oda: {room}");
 
         string snapshot = $"State={state} Connected={serviceConnected} Connecting={connecting} InRoom={inRoom} Role={role}";
         if (snapshot != lastStateSnapshot)
@@ -668,106 +650,43 @@ public sealed class LanConnectionPanel : MonoBehaviour
 
     private void BuildPanel()
     {
+        if (panelPrefab == null)
+        {
+            Debug.LogError("[LAN] Panel prefab referansi atanmamis.", this);
+            enabled = false;
+            return;
+        }
+
         Transform existing = targetCanvas.transform.Find("LAN Connection Panel");
         if (existing != null)
             Destroy(existing.gameObject);
 
-        RectTransform panel = CreateRect("LAN Connection Panel", targetCanvas.transform);
-        panel.anchorMin = new Vector2(1f, 1f);
-        panel.anchorMax = new Vector2(1f, 1f);
-        panel.pivot = new Vector2(1f, 1f);
-        panel.anchoredPosition = new Vector2(-20f, -20f);
-        panel.sizeDelta = new Vector2(440f, 480f);
+        GameObject panel = Instantiate(panelPrefab, targetCanvas.transform, false);
+        panel.name = panelPrefab.name;
 
-        Image background = panel.gameObject.AddComponent<Image>();
-        background.color = new Color(0.035f, 0.05f, 0.07f, 0.94f);
+        statusText = FindPanelComponent<TMP_Text>(panel.transform, "Status");
+        hostButton = FindPanelComponent<Button>(panel.transform, "Host LAN");
+        joinButton = FindPanelComponent<Button>(panel.transform, "Join LAN");
+        resetItemButton = FindPanelComponent<Button>(panel.transform, "Reset Item");
 
-        TMP_Text title = CreateText("Title", panel, "ALTERUNA LAN TEST", 30f, FontStyles.Bold);
-        SetRect(title.rectTransform, new Vector2(20f, -18f), new Vector2(400f, 42f));
+        if (statusText == null || hostButton == null || joinButton == null || resetItemButton == null)
+        {
+            Debug.LogError(
+                "[LAN] Panel prefabinda Status, Host LAN, Join LAN veya Reset Item eksik.",
+                panel);
+            enabled = false;
+            return;
+        }
 
-        statusText = CreateText("Status", panel, string.Empty, 20f, FontStyles.Normal);
-        statusText.color = new Color(0.75f, 0.9f, 1f, 1f);
-        SetRect(statusText.rectTransform, new Vector2(20f, -65f), new Vector2(400f, 72f));
-
-        hostButton = CreateButton("Host LAN", panel, "HOST LAN", new Vector2(20f, -145f), HostLan);
-        joinButton = CreateButton("Join LAN", panel, "JOIN LAN", new Vector2(230f, -145f), JoinLan);
-        spawnButton = CreateButton("Spawn Test", panel, "HOST: TEST KUPU URET", new Vector2(20f, -218f), SpawnTestObject, 400f);
-        resetItemButton = CreateButton("Reset Item", panel, "NESNEYI SIFIRLA", new Vector2(20f, -286f), ResetCurrentItem, 400f);
-
-        TMP_Text hint = CreateText(
-            "Hint",
-            panel,
-            "Iki cihaz ayni Wi-Fi/hotspot'ta olmali. Once bir cihaz Host, sonra diger cihaz Join secsin.",
-            17f,
-            FontStyles.Normal);
-        hint.color = new Color(0.72f, 0.72f, 0.72f, 1f);
-        SetRect(hint.rectTransform, new Vector2(20f, -360f), new Vector2(400f, 70f));
+        hostButton.onClick.AddListener(HostLan);
+        joinButton.onClick.AddListener(JoinLan);
+        resetItemButton.onClick.AddListener(ResetCurrentItem);
     }
 
-    private static Button CreateButton(
-        string name,
-        Transform parent,
-        string label,
-        Vector2 position,
-        UnityEngine.Events.UnityAction action,
-        float width = 190f)
+    private static T FindPanelComponent<T>(Transform panel, string childName) where T : Component
     {
-        RectTransform rect = CreateRect(name, parent);
-        SetRect(rect, position, new Vector2(width, 58f));
-
-        Image image = rect.gameObject.AddComponent<Image>();
-        image.color = new Color(0.08f, 0.42f, 0.23f, 1f);
-
-        Button button = rect.gameObject.AddComponent<Button>();
-        button.targetGraphic = image;
-        button.onClick.AddListener(action);
-
-        ColorBlock colors = button.colors;
-        colors.highlightedColor = new Color(0.12f, 0.62f, 0.34f, 1f);
-        colors.pressedColor = new Color(0.05f, 0.28f, 0.15f, 1f);
-        colors.disabledColor = new Color(0.15f, 0.18f, 0.17f, 0.7f);
-        button.colors = colors;
-
-        TMP_Text text = CreateText("Label", rect, label, 22f, FontStyles.Bold);
-        text.alignment = TextAlignmentOptions.Center;
-        text.raycastTarget = false;
-        text.rectTransform.anchorMin = Vector2.zero;
-        text.rectTransform.anchorMax = Vector2.one;
-        text.rectTransform.offsetMin = Vector2.zero;
-        text.rectTransform.offsetMax = Vector2.zero;
-
-        return button;
-    }
-
-    private static TMP_Text CreateText(string name, Transform parent, string value, float size, FontStyles style)
-    {
-        RectTransform rect = CreateRect(name, parent);
-        TextMeshProUGUI text = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        text.text = value;
-        text.fontSize = size;
-        text.fontStyle = style;
-        text.color = Color.white;
-        text.alignment = TextAlignmentOptions.MidlineLeft;
-        text.overflowMode = TextOverflowModes.Overflow;
-        text.textWrappingMode = TextWrappingModes.Normal;
-        return text;
-    }
-
-    private static RectTransform CreateRect(string name, Transform parent)
-    {
-        GameObject instance = new GameObject(name, typeof(RectTransform));
-        RectTransform rect = instance.GetComponent<RectTransform>();
-        rect.SetParent(parent, false);
-        return rect;
-    }
-
-    private static void SetRect(RectTransform rect, Vector2 position, Vector2 size)
-    {
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = position;
-        rect.sizeDelta = size;
+        Transform child = panel.Find(childName);
+        return child != null ? child.GetComponent<T>() : null;
     }
 
     private void SetStatus(string message)
