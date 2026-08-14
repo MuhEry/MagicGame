@@ -23,6 +23,7 @@ public sealed class NetworkGrabOwnership : AttributesSync
     private Coroutine releaseRoutine;
 
     public int LastInteractorIndex => lastInteractorIndex;
+    public static bool IsHoldingAnyLocalItem => locallyHeldItem != null;
 
     private void Awake()
     {

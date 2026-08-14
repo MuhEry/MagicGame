@@ -22,12 +22,15 @@ public sealed class LanConnectionPanel : MonoBehaviour
     [SerializeField] private MultiplayerManager multiplayerManager;
     [SerializeField] private Canvas targetCanvas;
     [SerializeField] private GameObject panelPrefab;
+    [SerializeField] private Transform hostResetPoint;
+    [SerializeField] private Transform clientResetPoint;
 
     private TMP_Text statusText;
     private Button hostButton;
     private Button joinButton;
     private Button shiftButton;
     private Button resetItemButton;
+    private Button resetPositionButton;
     private ItemSpawner itemSpawner;
     private float nextStatusRefresh;
     private string lastStateSnapshot;
@@ -167,6 +170,46 @@ public sealed class LanConnectionPanel : MonoBehaviour
         SetStatus("Aktif esya bacada sifirlaniyor...");
     }
 
+    public void ResetPlayerPosition()
+    {
+        if (!multiplayerManager.InRoom)
+        {
+            SetStatus("Konumu sifirlamak icin once LAN oturumuna baglan.");
+            return;
+        }
+
+        if (NetworkGrabOwnership.IsHoldingAnyLocalItem)
+        {
+            SetStatus("Konumu sifirlamadan once tuttugun esyayi birak.");
+            return;
+        }
+
+        PlayerRefs playerRefs = PlayerRefs.Instance;
+        if (playerRefs == null)
+            playerRefs = FindFirstObjectByType<PlayerRefs>(FindObjectsInactive.Include);
+
+        Transform target = multiplayerManager.IsHost() ? hostResetPoint : clientResetPoint;
+        if (target == null)
+        {
+            string targetName = multiplayerManager.IsHost()
+                ? "Avatar Spawn A (Host)"
+                : "Avatar Spawn B (Client)";
+            GameObject targetObject = GameObject.Find(targetName);
+            if (targetObject != null)
+                target = targetObject.transform;
+        }
+
+        if (playerRefs == null || !playerRefs.ResetTrackingOriginTo(target))
+        {
+            SetStatus("XR konumu sifirlanamadi; oyuncu referanslari eksik.");
+            return;
+        }
+
+        SetStatus(multiplayerManager.IsHost()
+            ? "Konum Host baslangic noktasina sifirlandi."
+            : "Konum Client baslangic noktasina sifirlandi.");
+    }
+
     private void RunConnectionAction(string operation, string pendingMessage, Action action)
     {
         // IsConnected, Alteruna servis baglantisini da kapsar. Lisans
@@ -228,6 +271,8 @@ public sealed class LanConnectionPanel : MonoBehaviour
             shiftButton.interactable = inRoom && isHost;
         if (resetItemButton != null)
             resetItemButton.interactable = inRoom && isHost && itemSpawner != null && itemSpawner.CurrentSpawnedItem != null;
+        if (resetPositionButton != null)
+            resetPositionButton.interactable = inRoom;
 
         string service = inRoom ? "OTURUMDA" : connecting ? "BAGLANIYOR" : serviceConnected ? "BAGLI" : "HAZIR";
         string role = inRoom ? (isHost ? "HOST" : "CLIENT") : "-";
@@ -668,11 +713,15 @@ public sealed class LanConnectionPanel : MonoBehaviour
         hostButton = FindPanelComponent<Button>(panel.transform, "Host LAN");
         joinButton = FindPanelComponent<Button>(panel.transform, "Join LAN");
         resetItemButton = FindPanelComponent<Button>(panel.transform, "Reset Item");
+        resetPositionButton = FindPanelComponent<Button>(panel.transform, "Reset Position");
+        if (resetPositionButton == null && resetItemButton != null)
+            resetPositionButton = CreateResetPositionButton(panel.transform);
 
-        if (statusText == null || hostButton == null || joinButton == null || resetItemButton == null)
+        if (statusText == null || hostButton == null || joinButton == null ||
+            resetItemButton == null || resetPositionButton == null)
         {
             Debug.LogError(
-                "[LAN] Panel prefabinda Status, Host LAN, Join LAN veya Reset Item eksik.",
+                "[LAN] Panel prefabinda gerekli buton veya metinlerden biri eksik.",
                 panel);
             enabled = false;
             return;
@@ -681,6 +730,30 @@ public sealed class LanConnectionPanel : MonoBehaviour
         hostButton.onClick.AddListener(HostLan);
         joinButton.onClick.AddListener(JoinLan);
         resetItemButton.onClick.AddListener(ResetCurrentItem);
+        resetPositionButton.onClick.AddListener(ResetPlayerPosition);
+    }
+
+    private Button CreateResetPositionButton(Transform panel)
+    {
+        Button button = Instantiate(resetItemButton, resetItemButton.transform.parent, false);
+        button.name = "Reset Position";
+        button.onClick.RemoveAllListeners();
+
+        RectTransform buttonRect = button.GetComponent<RectTransform>();
+        buttonRect.anchoredPosition += Vector2.down * 73f;
+
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.text = "KONUMU SIFIRLA";
+
+        RectTransform panelRect = panel.GetComponent<RectTransform>();
+        panelRect.sizeDelta += Vector2.up * 73f;
+
+        Transform hint = panel.Find("Hint");
+        if (hint != null && hint.TryGetComponent(out RectTransform hintRect))
+            hintRect.anchoredPosition += Vector2.down * 73f;
+
+        return button;
     }
 
     private static T FindPanelComponent<T>(Transform panel, string childName) where T : Component

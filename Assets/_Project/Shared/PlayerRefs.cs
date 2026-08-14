@@ -77,6 +77,31 @@ public class PlayerRefs : MonoBehaviour
             this);
     }
 
+    public bool ResetTrackingOriginTo(Transform target)
+    {
+        ResolveMissingReferences();
+        if (target == null || trackingOriginTransform == null || headTransform == null)
+            return false;
+
+        Vector3 headForward = Vector3.ProjectOnPlane(headTransform.forward, Vector3.up);
+        Vector3 targetForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
+        if (headForward.sqrMagnitude > 0.001f && targetForward.sqrMagnitude > 0.001f)
+        {
+            float yaw = Vector3.SignedAngle(headForward, targetForward, Vector3.up);
+            trackingOriginTransform.RotateAround(headTransform.position, Vector3.up, yaw);
+        }
+
+        Vector3 correction = new Vector3(
+            target.position.x - headTransform.position.x,
+            target.position.y - trackingOriginTransform.position.y,
+            target.position.z - headTransform.position.z);
+        trackingOriginTransform.position += correction;
+        Physics.SyncTransforms();
+
+        Debug.Log($"[PlayerRefs] XR konumu sifirlandi. Hedef={target.name}", this);
+        return true;
+    }
+
     private static Transform FindSceneTransform(string objectName)
     {
         Transform[] transforms = FindObjectsByType<Transform>(
