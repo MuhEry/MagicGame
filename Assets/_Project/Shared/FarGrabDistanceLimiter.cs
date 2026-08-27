@@ -72,23 +72,17 @@ public sealed class FarGrabDistanceLimiter : MonoBehaviour
         Vector3 offset = anchor.position - follow.position;
         float distance = offset.magnitude;
 
-        if (binding.Controller.hasOffset && distance > Vector3.kEpsilon)
-        {
-            binding.LastDirection = offset / distance;
+        if (binding.Controller.hasOffset)
             binding.WasFarSelection = true;
-        }
 
         if (!binding.WasFarSelection || distance >= minimumDistance)
             return;
 
-        Vector3 direction = distance > Vector3.kEpsilon
-            ? offset / distance
-            : binding.LastDirection;
-
-        if (direction.sqrMagnitude < Vector3.kEpsilon)
-            direction = follow.forward;
-
-        attachController.MoveTo(follow.position + direction * minimumDistance);
+        // Cok yakinda eski tutus acisini korumak, kumanda dondugunde isin
+        // bukulmesine ve nesnenin tekrar uzaklastirilirken yana kacmasina yol
+        // aciyordu. Minimum mesafede ekseni kumandanin guncel ileri yonune
+        // yeniden hizala; bundan sonraki itme/cekme hareketi duz devam eder.
+        attachController.MoveTo(follow.position + follow.forward * minimumDistance);
     }
 
     private sealed class Binding
@@ -96,7 +90,6 @@ public sealed class FarGrabDistanceLimiter : MonoBehaviour
         public readonly NearFarInteractor Interactor;
         public readonly InteractionAttachController Controller;
         public Action Callback;
-        public Vector3 LastDirection;
         public bool WasFarSelection;
 
         public Binding(NearFarInteractor interactor, InteractionAttachController controller)

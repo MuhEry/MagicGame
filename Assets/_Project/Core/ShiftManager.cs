@@ -79,6 +79,15 @@ public class ShiftManager : AttributesSync
     [SynchronizableField] private int player1Incorrect;
     [SynchronizableField] private int player0ShiftWins;
     [SynchronizableField] private int player1ShiftWins;
+    [SynchronizableField] private float reportAverageInspectMs;
+    [SynchronizableField] private bool reportHasMostConfusedCategory;
+    [SynchronizableField] private int reportMostConfusedCategory;
+    [SynchronizableField] private float reportPlayer0AverageInspectMs;
+    [SynchronizableField] private bool reportPlayer0HasMostConfusedCategory;
+    [SynchronizableField] private int reportPlayer0MostConfusedCategory;
+    [SynchronizableField] private float reportPlayer1AverageInspectMs;
+    [SynchronizableField] private bool reportPlayer1HasMostConfusedCategory;
+    [SynchronizableField] private int reportPlayer1MostConfusedCategory;
     private int lastPublishedWholeSecond = -1;
     private ShiftState lastObservedState = ShiftState.Hazir;
     private int lastDecisionItemId = -1;
@@ -139,6 +148,9 @@ public class ShiftManager : AttributesSync
         {
             lastObservedState = State;
             OnStateChanged?.Invoke(State);
+
+            if (State == ShiftState.Rapor)
+                PublishSynchronizedReport();
         }
 
         PublishTime(false);
@@ -183,6 +195,15 @@ public class ShiftManager : AttributesSync
         totalInspectMs = 0f;
         player0TotalInspectMs = 0f;
         player1TotalInspectMs = 0f;
+        reportAverageInspectMs = 0f;
+        reportHasMostConfusedCategory = false;
+        reportMostConfusedCategory = 0;
+        reportPlayer0AverageInspectMs = 0f;
+        reportPlayer0HasMostConfusedCategory = false;
+        reportPlayer0MostConfusedCategory = 0;
+        reportPlayer1AverageInspectMs = 0f;
+        reportPlayer1HasMostConfusedCategory = false;
+        reportPlayer1MostConfusedCategory = 0;
         incorrectByCategory.Clear();
         player0IncorrectByCategory.Clear();
         player1IncorrectByCategory.Clear();
@@ -440,97 +461,54 @@ public class ShiftManager : AttributesSync
             player1ShiftWins++;
 
         LastReport = BuildReport();
+        CopyReportToSynchronizedFields(LastReport);
         SetState(ShiftState.Rapor);
         OnReportReady?.Invoke(LastReport);
-        BroadcastRemoteMethod(
-            nameof(ReceiveShiftReport),
-            LastReport.sessionId,
-            LastReport.correctCount,
-            LastReport.incorrectCount,
-            LastReport.inspectedItemCount,
-            LastReport.totalShakeCount,
-            LastReport.averageInspectMs,
-            LastReport.hasMostConfusedCategory,
-            (int)LastReport.mostConfusedCategory,
-            LastReport.player0Correct,
-            LastReport.player0Incorrect,
-            LastReport.player0ShiftWins,
-            LastReport.player0AverageInspectMs,
-            LastReport.player0HasMostConfusedCategory,
-            (int)LastReport.player0MostConfusedCategory,
-            LastReport.player1Correct,
-            LastReport.player1Incorrect,
-            LastReport.player1ShiftWins,
-            LastReport.player1AverageInspectMs,
-            LastReport.player1HasMostConfusedCategory,
-            (int)LastReport.player1MostConfusedCategory,
-            LastReport.winnerIndex);
         ForceSync();
     }
 
-    [SynchronizableMethod]
-    private void ReceiveShiftReport(
-        int sessionId,
-        int reportCorrectCount,
-        int reportIncorrectCount,
-        int reportInspectedCount,
-        int reportShakeCount,
-        float averageInspectMs,
-        bool hasMostConfusedCategory,
-        int mostConfusedCategory,
-        int reportPlayer0Correct,
-        int reportPlayer0Incorrect,
-        int reportPlayer0ShiftWins,
-        float reportPlayer0AverageInspectMs,
-        bool reportPlayer0HasMostConfusedCategory,
-        int reportPlayer0MostConfusedCategory,
-        int reportPlayer1Correct,
-        int reportPlayer1Incorrect,
-        int reportPlayer1ShiftWins,
-        float reportPlayer1AverageInspectMs,
-        bool reportPlayer1HasMostConfusedCategory,
-        int reportPlayer1MostConfusedCategory,
-        int winnerIndex)
+    private void CopyReportToSynchronizedFields(ShiftReport report)
     {
-        if (IsHostAuthority)
-            return;
+        reportAverageInspectMs = report.averageInspectMs;
+        reportHasMostConfusedCategory = report.hasMostConfusedCategory;
+        reportMostConfusedCategory = (int)report.mostConfusedCategory;
+        reportPlayer0AverageInspectMs = report.player0AverageInspectMs;
+        reportPlayer0HasMostConfusedCategory = report.player0HasMostConfusedCategory;
+        reportPlayer0MostConfusedCategory = (int)report.player0MostConfusedCategory;
+        reportPlayer1AverageInspectMs = report.player1AverageInspectMs;
+        reportPlayer1HasMostConfusedCategory = report.player1HasMostConfusedCategory;
+        reportPlayer1MostConfusedCategory = (int)report.player1MostConfusedCategory;
+    }
 
+    private void PublishSynchronizedReport()
+    {
         LastReport = new ShiftReport
         {
-            sessionId = sessionId,
-            correctCount = reportCorrectCount,
-            incorrectCount = reportIncorrectCount,
-            inspectedItemCount = reportInspectedCount,
-            totalShakeCount = reportShakeCount,
-            averageInspectMs = averageInspectMs,
-            hasMostConfusedCategory = hasMostConfusedCategory,
-            mostConfusedCategory = (ItemCategory)mostConfusedCategory,
-            player0Correct = reportPlayer0Correct,
-            player0Incorrect = reportPlayer0Incorrect,
-            player0Score = reportPlayer0Correct - reportPlayer0Incorrect,
-            player0ShiftWins = reportPlayer0ShiftWins,
+            sessionId = currentSessionId,
+            correctCount = correctCount,
+            incorrectCount = incorrectCount,
+            inspectedItemCount = inspectedItemCount,
+            totalShakeCount = totalShakeCount,
+            averageInspectMs = reportAverageInspectMs,
+            hasMostConfusedCategory = reportHasMostConfusedCategory,
+            mostConfusedCategory = (ItemCategory)reportMostConfusedCategory,
+            player0Correct = player0Correct,
+            player0Incorrect = player0Incorrect,
+            player0Score = Player0Score,
+            player0ShiftWins = player0ShiftWins,
             player0AverageInspectMs = reportPlayer0AverageInspectMs,
             player0HasMostConfusedCategory = reportPlayer0HasMostConfusedCategory,
             player0MostConfusedCategory = (ItemCategory)reportPlayer0MostConfusedCategory,
-            player1Correct = reportPlayer1Correct,
-            player1Incorrect = reportPlayer1Incorrect,
-            player1Score = reportPlayer1Correct - reportPlayer1Incorrect,
-            player1ShiftWins = reportPlayer1ShiftWins,
+            player1Correct = player1Correct,
+            player1Incorrect = player1Incorrect,
+            player1Score = Player1Score,
+            player1ShiftWins = player1ShiftWins,
             player1AverageInspectMs = reportPlayer1AverageInspectMs,
             player1HasMostConfusedCategory = reportPlayer1HasMostConfusedCategory,
             player1MostConfusedCategory = (ItemCategory)reportPlayer1MostConfusedCategory,
-            winnerIndex = winnerIndex
+            winnerIndex = GetWinnerIndex()
         };
-        player0Correct = reportPlayer0Correct;
-        player0Incorrect = reportPlayer0Incorrect;
-        player0ShiftWins = reportPlayer0ShiftWins;
-        player1Correct = reportPlayer1Correct;
-        player1Incorrect = reportPlayer1Incorrect;
-        player1ShiftWins = reportPlayer1ShiftWins;
-        correctCount = reportCorrectCount;
-        incorrectCount = reportIncorrectCount;
-        inspectedItemCount = reportInspectedCount;
-        totalShakeCount = reportShakeCount;
+
         OnReportReady?.Invoke(LastReport);
     }
 

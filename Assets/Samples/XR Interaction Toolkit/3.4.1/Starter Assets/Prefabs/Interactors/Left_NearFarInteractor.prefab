@@ -187,7 +187,7 @@ MonoBehaviour:
     m_CustomizeExpandLineDrawPercent: 1
     m_ExpandModeLineDrawPercent: 0.9
   m_SelectHitProperties:
-    m_SmoothlyCurveLine: 1
+    m_SmoothlyCurveLine: 0
     m_LineBendRatio: 0.5
     m_AdjustWidth: 1
     m_StartWidth: 0.003
@@ -631,7 +631,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_TransformToFollow: {fileID: 5745700813747042508}
-  m_MotionStabilizationMode: 1
+  m_MotionStabilizationMode: 0
   m_PositionStabilization: 0.25
   m_AngleStabilization: 20
   m_SmoothOffset: 0
